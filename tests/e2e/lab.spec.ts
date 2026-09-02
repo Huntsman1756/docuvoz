@@ -96,5 +96,5 @@ test("Listen mode exposes engine stats and fallback semantics", async ({ page })
   await expect(list).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/\d+ segments/)).toBeVisible();
   await expect(page.getByText(/\d+ transformed/)).toBeVisible();
-  await expect(page.getByText(/engine 1\.0\.0/)).toBeVisible();
+  await expect(page.getByText(/engine 1\.1\.0/)).toBeVisible();
 });
