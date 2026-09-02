@@ -1,0 +1,91 @@
+{
+  "id": "ref-extraction-artifacts-01",
+  "source": {
+    "name": "extraction-artifacts-01.pdf",
+    "pageCount": 2,
+    "language": "es"
+  },
+  "blocks": [
+    {
+      "id": "b0",
+      "type": "page-header",
+      "text": "B O L E T I N   O F I C I A L   D E L   E S T A D O",
+      "page": 1,
+      "order": 0
+    },
+    {
+      "id": "b1",
+      "type": "heading",
+      "text": "RESOLUCIÓN DE PRUEBA",
+      "page": 1,
+      "order": 1,
+      "level": 2
+    },
+    {
+      "id": "b2",
+      "type": "paragraph",
+      "text": "El  procedimiento  sancionador  se  iniciará  de  oficio,  salvo  que  el  interesado  aporte  alegaciones  en  el  plazo  de  quince  días  hábiles.",
+      "page": 1,
+      "order": 2
+    },
+    {
+      "id": "b3",
+      "type": "paragraph",
+      "text": "La resolución podrá ser inter- puesta ante el mismo órgano que la hubiera dictado en el plazo de un mes desde el día siguiente a su notificación.",
+      "page": 1,
+      "order": 3
+    },
+    {
+      "id": "b4",
+      "type": "page-footer",
+      "text": "www BOE   ejemplo   es — página",
+      "page": 1,
+      "order": 4
+    },
+    {
+      "id": "b5",
+      "type": "page-number",
+      "text": "página 1",
+      "page": 1,
+      "order": 5
+    },
+    {
+      "id": "b6",
+      "type": "page-header",
+      "text": "B O L E T I N   O F I C I A L   D E L   E S T A D O",
+      "page": 2,
+      "order": 6
+    },
+    {
+      "id": "b7",
+      "type": "heading",
+      "text": "SEGUNDO. RÉGIMEN RECURSORIO",
+      "page": 2,
+      "order": 7,
+      "level": 2
+    },
+    {
+      "id": "b8",
+      "type": "paragraph",
+      "text": "Contra la presente resolución, que no pone fin a la vía administrativa, podrá interponerse recurso de alzada en el plazo de un mes, de conformidad con lo establecido en los artículos 121 y 122 de la Ley 39/2015.",
+      "page": 2,
+      "order": 8
+    },
+    {
+      "id": "b9",
+      "type": "page-footer",
+      "text": "www BOE   ejemplo   es — página",
+      "page": 2,
+      "order": 9
+    },
+    {
+      "id": "b10",
+      "type": "page-number",
+      "text": "página 2",
+      "page": 2,
+      "order": 10
+    }
+  ],
+  "parser": "docling-reference-export",
+  "parserVersion": "0.0.0-synthetic"
+}

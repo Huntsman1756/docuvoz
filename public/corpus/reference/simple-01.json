@@ -1,0 +1,55 @@
+{
+  "id": "ref-simple-01",
+  "source": {
+    "name": "simple-01.pdf",
+    "pageCount": 2,
+    "language": "es"
+  },
+  "blocks": [
+    {
+      "id": "b0",
+      "type": "heading",
+      "text": "NOTA INFORMATIVA",
+      "page": 1,
+      "order": 0,
+      "level": 2
+    },
+    {
+      "id": "b1",
+      "type": "paragraph",
+      "text": "Esta nota es un documento de prueba completamente ficticio. Su objetivo es verificar el flujo de extracción y reproducción.",
+      "page": 1,
+      "order": 1
+    },
+    {
+      "id": "b2",
+      "type": "paragraph",
+      "text": "El texto contiene un número cualquiera, 42, y una fecha de muestra, 3 de mayo de 2026.",
+      "page": 1,
+      "order": 2
+    },
+    {
+      "id": "b3",
+      "type": "page-number",
+      "text": "página 1",
+      "page": 1,
+      "order": 3
+    },
+    {
+      "id": "b4",
+      "type": "paragraph",
+      "text": "La segunda página añade un párrafo adicional para comprobar el orden de lectura entre páginas.",
+      "page": 2,
+      "order": 4
+    },
+    {
+      "id": "b5",
+      "type": "page-number",
+      "text": "página 2",
+      "page": 2,
+      "order": 5
+    }
+  ],
+  "parser": "docling-reference-export",
+  "parserVersion": "0.0.0-synthetic"
+}

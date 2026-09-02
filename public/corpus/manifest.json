@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "notice": "All fixtures are synthetic and legally safe to redistribute. Real Spanish regulatory texts (BOE/CNMV/Banco de España/EUR-Lex) may have redistribution restrictions; corpus/README.md explains how to add local, uncommitted real-world documents and how their hashes are recorded.",
+  "entries": [
+    {
+      "id": "nested-regulation-01",
+      "title": "Circular ficticia 1/2024",
+      "category": "nested-regulation",
+      "description": "Nested legal numbering, article references, exceptions, obligations, percentages, EUR amounts, numeric dates, BOE citation, T+2 settlement.",
+      "pdf": "/corpus/pdfs/nested-regulation-01.pdf",
+      "reference": "/corpus/reference/nested-regulation-01.json",
+      "gold": "/corpus/gold/nested-regulation-01.json",
+      "synthetic": true
+    },
+    {
+      "id": "financial-report-01",
+      "title": "Informe financiero ficticio",
+      "category": "financial",
+      "description": "Financial abbreviations, ISIN/LEI identifiers, basis points, euro millions, ranges, acronyms.",
+      "pdf": "/corpus/pdfs/financial-report-01.pdf",
+      "reference": "/corpus/reference/financial-report-01.json",
+      "synthetic": true
+    },
+    {
+      "id": "extraction-artifacts-01",
+      "title": "Artefactos de extracción",
+      "category": "extraction-artifacts",
+      "description": "Repeated chrome on every page, stray whitespace runs and hyphenated line breaks typical of PDF text extraction.",
+      "pdf": "/corpus/pdfs/extraction-artifacts-01.pdf",
+      "reference": "/corpus/reference/extraction-artifacts-01.json",
+      "synthetic": true
+    },
+    {
+      "id": "simple-01",
+      "title": "Documento simple",
+      "category": "native-simple",
+      "description": "Clean two-page document with minimal structure, used as the baseline sanity check and for end-to-end tests.",
+      "pdf": "/corpus/pdfs/simple-01.pdf",
+      "reference": "/corpus/reference/simple-01.json",
+      "synthetic": true
+    }
+  ]
+}

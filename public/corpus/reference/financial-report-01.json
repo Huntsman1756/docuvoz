@@ -1,0 +1,85 @@
+{
+  "id": "ref-financial-report-01",
+  "source": {
+    "name": "financial-report-01.pdf",
+    "pageCount": 1,
+    "language": "es"
+  },
+  "blocks": [
+    {
+      "id": "b0",
+      "type": "page-header",
+      "text": "Informe de situación (sintético)",
+      "page": 1,
+      "order": 0
+    },
+    {
+      "id": "b1",
+      "type": "heading",
+      "text": "INFORME DE SITUACIÓN PATRIMONIAL — TERCER TRIMESTRE DE 2025",
+      "page": 1,
+      "order": 1,
+      "level": 2
+    },
+    {
+      "id": "b2",
+      "type": "paragraph",
+      "text": "El volumen total de operaciones ascendió a 47.408 millones de euros, lo que supone un incremento del 3,75 % respecto al trimestre anterior.",
+      "page": 1,
+      "order": 2
+    },
+    {
+      "id": "b3",
+      "type": "paragraph",
+      "text": "La cartera de renta fija incluye el ISIN ES0123456789, emitido al amparo del Programa de pagarés, con un nominal de 250.000 EUR.",
+      "page": 1,
+      "order": 3
+    },
+    {
+      "id": "b4",
+      "type": "paragraph",
+      "text": "El identificador de la contraparte principal es el LEI VAVR88822QQ763F4A823. La entidad deberá conservar la trazabilidad de las liquidaciones T+1 durante los próximos 10–15 años.",
+      "page": 1,
+      "order": 4
+    },
+    {
+      "id": "b5",
+      "type": "paragraph",
+      "text": "El margen de intereses se situó en 0,50 €, un 12 % por debajo de la previsión del BCE para el área de la UE.",
+      "page": 1,
+      "order": 5
+    },
+    {
+      "id": "b6",
+      "type": "list-item",
+      "text": "— Provisiones: 2.345,67 euros.",
+      "page": 1,
+      "order": 6,
+      "listLevel": 0
+    },
+    {
+      "id": "b7",
+      "type": "list-item",
+      "text": "— Ratio de eficiencia: 54,3 %.",
+      "page": 1,
+      "order": 7,
+      "listLevel": 0
+    },
+    {
+      "id": "b8",
+      "type": "page-footer",
+      "text": "Página confidencial de prueba",
+      "page": 1,
+      "order": 8
+    },
+    {
+      "id": "b9",
+      "type": "page-number",
+      "text": "página 1",
+      "page": 1,
+      "order": 9
+    }
+  ],
+  "parser": "docling-reference-export",
+  "parserVersion": "0.0.0-synthetic"
+}

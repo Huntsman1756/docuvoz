@@ -1,0 +1,26 @@
+{
+  "fixtureId": "nested-regulation-01",
+  "notice": "Manual Gold is a human-authored spoken upper bound for experiments (gate G3a). It is never produced by the automatic engine.",
+  "entries": [
+    {
+      "blockId": "b5",
+      "spokenText": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra b, de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el Boletín Oficial del Estado número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres."
+    },
+    {
+      "blockId": "b6",
+      "spokenText": "No obstante, quedarán exentas las entidades a que se refiere el apartado tres, salvo que superen un ratio de solvencia del ocho coma cinco por ciento durante dos ejercicios consecutivos."
+    },
+    {
+      "blockId": "b12",
+      "spokenText": "Punto primero. Las entidades deberán remitir la información antes del quince de julio de dos mil veinticuatro y, a más tardar, a las catorce horas, hora peninsular."
+    },
+    {
+      "blockId": "b13",
+      "spokenText": "Letra a. El umbral máximo será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos."
+    },
+    {
+      "blockId": "b15",
+      "spokenText": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+    }
+  ]
+}

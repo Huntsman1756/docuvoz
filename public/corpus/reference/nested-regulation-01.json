@@ -1,0 +1,200 @@
+{
+  "id": "ref-nested-regulation-01",
+  "source": {
+    "name": "nested-regulation-01.pdf",
+    "pageCount": 3,
+    "language": "es"
+  },
+  "blocks": [
+    {
+      "id": "b0",
+      "type": "page-header",
+      "text": "Circular 1/2024, de 12 de junio (documento de prueba)",
+      "page": 1,
+      "order": 0
+    },
+    {
+      "id": "b1",
+      "type": "heading",
+      "text": "CIRCULAR 1/2024, DE 12 DE JUNIO, POR LA QUE SE ESTABLECEN OBLIGACIONES DE INFORME (DOCUMENTO DE PRUEBA)",
+      "page": 1,
+      "order": 1,
+      "level": 2
+    },
+    {
+      "id": "b2",
+      "type": "paragraph",
+      "text": "La presente Circular tiene carácter íntegramente ficticio y se publica exclusivamente con fines de evaluación técnica. No constituye una reproducción de ninguna disposición real.",
+      "page": 1,
+      "order": 2
+    },
+    {
+      "id": "b3",
+      "type": "heading",
+      "text": "CAPÍTULO I. OBJETO Y ÁMBITO DE APLICACIÓN",
+      "page": 1,
+      "order": 3,
+      "level": 1
+    },
+    {
+      "id": "b4",
+      "type": "paragraph",
+      "text": "Artículo 1. Objeto. La presente Circular establece las obligaciones de información periódica de las entidades de crédito en relación con sus activos ponderados por riesgo.",
+      "page": 1,
+      "order": 4
+    },
+    {
+      "id": "b5",
+      "type": "paragraph",
+      "text": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el art. 57.1.b) de la Ley 47/2003, de 26 de noviembre, publicada en el BOE núm. 288, de 2 de diciembre de 2003, sin perjuicio de lo dispuesto en el apartado 3.",
+      "page": 1,
+      "order": 5
+    },
+    {
+      "id": "b6",
+      "type": "paragraph",
+      "text": "No obstante, quedarán exentas las entidades a que se refiere el apartado 3, salvo que superen un ratio de solvencia del 8,5 % durante dos ejercicios consecutivos.",
+      "page": 1,
+      "order": 6
+    },
+    {
+      "id": "b7",
+      "type": "page-footer",
+      "text": "CNMV — documento de prueba no oficial",
+      "page": 1,
+      "order": 7
+    },
+    {
+      "id": "b8",
+      "type": "page-number",
+      "text": "página 1",
+      "page": 1,
+      "order": 8
+    },
+    {
+      "id": "b9",
+      "type": "page-header",
+      "text": "Circular 1/2024, de 12 de junio (documento de prueba)",
+      "page": 2,
+      "order": 9
+    },
+    {
+      "id": "b10",
+      "type": "heading",
+      "text": "CAPÍTULO II. INFORMACIÓN PERIÓDICA",
+      "page": 2,
+      "order": 10,
+      "level": 1
+    },
+    {
+      "id": "b11",
+      "type": "paragraph",
+      "text": "Artículo 5. Información periódica.",
+      "page": 2,
+      "order": 11
+    },
+    {
+      "id": "b12",
+      "type": "paragraph",
+      "text": "1.º Las entidades deberán remitir la información antes del día 15/07/2024 y, a más tardar, a las 14:00, hora peninsular.",
+      "page": 2,
+      "order": 12
+    },
+    {
+      "id": "b13",
+      "type": "list-item",
+      "text": "a) El umbral máximo será de 1.234.567,89 euros.",
+      "page": 2,
+      "order": 13,
+      "listLevel": 0
+    },
+    {
+      "id": "b14",
+      "type": "list-item",
+      "text": "b) El tipo aplicable será el resultado de incrementar el EURIBOR a 12 meses en 25 pb.",
+      "page": 2,
+      "order": 14,
+      "listLevel": 0
+    },
+    {
+      "id": "b15",
+      "type": "paragraph",
+      "text": "2.º Los importes superiores a 500.000 EUR deberán notificarse, además, en un plazo de T+2 días hábiles, siempre que el contrato se haya celebrado con posterioridad al 1 de enero de 2024.",
+      "page": 2,
+      "order": 15
+    },
+    {
+      "id": "b16",
+      "type": "page-footer",
+      "text": "CNMV — documento de prueba no oficial",
+      "page": 2,
+      "order": 16
+    },
+    {
+      "id": "b17",
+      "type": "page-number",
+      "text": "página 2",
+      "page": 2,
+      "order": 17
+    },
+    {
+      "id": "b18",
+      "type": "page-header",
+      "text": "Circular 1/2024, de 12 de junio (documento de prueba)",
+      "page": 3,
+      "order": 18
+    },
+    {
+      "id": "b19",
+      "type": "heading",
+      "text": "ANEXO I. MODELO DE INFORME",
+      "page": 3,
+      "order": 19,
+      "level": 2
+    },
+    {
+      "id": "b20",
+      "type": "table-cell",
+      "text": "Concepto: Fondo para intermedios financieros. Importe: 3.500,00 euros.",
+      "page": 3,
+      "order": 20
+    },
+    {
+      "id": "b21",
+      "type": "table-cell",
+      "text": "Concepto: Comisiones variables. Importe: 12,75 % del resultado.",
+      "page": 3,
+      "order": 21
+    },
+    {
+      "id": "b22",
+      "type": "paragraph",
+      "text": "El modelo de informe deberá presentarse conforme al Anexo I, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio 2023.",
+      "page": 3,
+      "order": 22
+    },
+    {
+      "id": "b23",
+      "type": "footnote",
+      "text": "(1) Los porcentajes se calcularán sobre el balance auditado a 31-12-2023.",
+      "page": 3,
+      "order": 23
+    },
+    {
+      "id": "b24",
+      "type": "page-footer",
+      "text": "CNMV — documento de prueba no oficial",
+      "page": 3,
+      "order": 24
+    },
+    {
+      "id": "b25",
+      "type": "page-number",
+      "text": "página 3",
+      "page": 3,
+      "order": 25
+    }
+  ],
+  "parser": "docling-reference-export",
+  "parserVersion": "0.0.0-synthetic"
+}
