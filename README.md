@@ -1,7 +1,6 @@
 # AUIDIO NAN — document-to-audio reading laboratory
 
 **Status: Phase 0 research prototype.** Not a product, not a hosted service.
-CI: [![CI](https://github.com/auidionan/auidionan/actions/workflows/ci.yml/badge.svg)](https://github.com/auidionan/auidionan/actions/workflows/ci.yml)
 License: [MIT](LICENSE)
 
 ## What this is
