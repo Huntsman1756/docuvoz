@@ -170,7 +170,8 @@ for (const fx of fixtures) {
   writeFileSync(join(outRef, `${fx.id}.json`), JSON.stringify(refDoc, null, 2));
   const gold = goldFile(fx, refDoc);
   if (gold) guardGoldRegression(join(outGold, `${fx.id}.json`), gold);
-  if (gold) writeFileSync(join(outGold, `${fx.id}.json`), JSON.stringify(gold, null, 2) + "\n");
+  if (gold)
+    writeFileSync(join(outGold, `${fx.id}.json`), JSON.stringify(gold, null, 2) + "\n");
 
   manifestEntries.push({
     id: fx.id,

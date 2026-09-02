@@ -97,7 +97,9 @@ describe("legal references", () => {
     expect(one(articleRule, "véase el art. 15.")).toBe("véase el artículo quince.");
   });
   it("G4b: keeps plural form in joint references", () => {
-    expect(run("de conformidad con lo establecido en los artículos 121 y 122 de la ley")).toBe(
+    expect(
+      run("de conformidad con lo establecido en los artículos 121 y 122 de la ley"),
+    ).toBe(
       "de conformidad con lo establecido en los artículos ciento veintiuno y ciento veintidós de la ley",
     );
     expect(run("arts. 10 a 12")).toBe("artículos diez a doce");
