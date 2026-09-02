@@ -12,6 +12,24 @@ changes are listed under the same headings.
 
 ### Changed
 
+- **Pre-publication sanitation (2026-09-02):** the 16 G3a WAV stimulus
+  binaries were removed from the public Git history before the first push
+  (provider ToS does not clearly grant redistribution rights over generated
+  audio). No experimental stimulus was regenerated or modified: the frozen
+  kit's canonical identity is the per-clip SHA-256 in
+  `evaluation/experiments/g3a/manifest.json` and the byte-exact WAVs held in
+  the private kit. Private archival bundle of the pre-rewrite repository is
+  retained outside the repo; original private freeze `6820515` is documented
+  as provenance (public history starts at the rewritten equivalent).
+- G3a gold provenance is now reproducible: `scripts/fixtures-def.mjs` is the
+  canonical carrier of all eight human-authored Manual Gold entries and
+  `npm run fixtures` refuses to drop or mutate any on-disk gold entry.
+- `G3B_AUTOMATION_PROXY` documented measurement updated to **0.945** on the
+  8-entry Manual Gold set (was 0.951 on the 5-entry set); engineering
+  regression alarm only, unchanged meaning.
+
+### Changed (earlier)
+
 - **Engine `1.1.0`** (`SPOKEN_ENGINE_VERSION`, invalidates audio cache): the
   `legal-references` rule no longer destroys the sentence boundary after a
   heading citation (`"Artículo 1. Objeto."` → `"artículo uno. Objeto."`, was

@@ -33,9 +33,11 @@ What each PASS is allowed to mean, and nothing more:
 - `PHASE_0_INFRASTRUCTURE = PASS` — the experiment can be run. Says nothing
   about outcomes.
 - `G3B_AUTOMATION_PROXY = PASS` — the deterministic engine reproduces the
-  gold surface of the corpus at 0.95 **word-level Dice**. This is a
-  _regression/coverage metric for engineers_: lexical similarity deliberately
-  penalizes orally-correct surface changes and cannot hear anything. It is
+  gold surface of the corpus at 0.945 **word-level Dice** (8-entry Manual
+  Gold set, measured 2026-09-02; earlier 5-entry measurement: 0.951). This
+  is a _regression/coverage metric for engineers_: lexical similarity
+  deliberately penalizes orally-correct surface changes and cannot hear
+  anything. It is
   **not** evidence about listening experience and must never be cited as
   "the engine captures 95% of the benefit".
 - `G1_TTS_LIVE = PASS` — measured 2026-09-02 against NaN cloud (kokoro,

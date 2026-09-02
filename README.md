@@ -110,7 +110,7 @@ PHASE_0_INFRASTRUCTURE        = PASS   builds/tests/gates runnable offline
 G1_TTS_LIVE                   = PASS   NaN live 15rpm: 12/12 ok, TTFA p95 1.63s, 0×429 (tts.json)
 G2_EXTRACTION_REAL            = OPEN   synthetic smoke only (tables 0/2, footnote 0/1)
 G3A_PRODUCT_HYPOTHESIS        = OPEN   blind protocol prepared, ears required
-G3B_AUTOMATION_PROXY          = PASS   word-level Dice 0.95 — engineering regression ONLY
+G3B_AUTOMATION_PROXY          = PASS   word-level Dice 0.945 — 8-entry gold set, 2026-09-02
 G3B_HUMAN                     = OPEN   capture-ratio protocol prepared (Literal/Gold/Listen)
 G4A_CRITICAL_LITERAL_PRESERV. = PASS   0 violations, 0 silent losses (machine-verified)
 G4B_SEMANTIC_FIDELITY         = PASS   32/32 human verdicts post-fix — reviewed corpus ONLY
@@ -168,6 +168,9 @@ History: [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 MIT — see [LICENSE](LICENSE). Third-party runtime components (pdf.js, Next.js,
-React, `idb`, `zod`) are permissively licensed; bundled model weights and
-audio (when using a real provider) are governed by **their** terms, not this
-license, and are never redistributed here.
+React, `idb`, `zod`) are permissively licensed; model weights and audio from
+real providers are governed by **their** terms, not this license. Generated
+TTS audio is **not** redistributed in this repository: the G3a experiment
+commits the blinded manifest with per-clip SHA-256 (stimulus identity) while
+the WAV binaries stay in the private experimental kit pending confirmation of
+redistribution rights from the TTS provider.
