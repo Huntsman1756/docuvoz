@@ -1,0 +1,53 @@
+{
+  "name": "auidionan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web-first laboratory for turning difficult Spanish regulatory documents into audio that is substantially better to listen to.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "predev": "npm run setup:pdfjs",
+    "build": "next build",
+    "prebuild": "npm run setup:pdfjs",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:provider:live": "RUN_LIVE_PROVIDER=1 vitest run tests/integration/live-provider.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "setup:pdfjs": "node scripts/copy-pdf-worker.mjs",
+    "fixtures": "node scripts/generate-fixture-pdfs.mjs",
+    "eval:extraction": "tsx evaluation/scripts/run-extraction-eval.ts",
+    "eval:spoken": "tsx evaluation/scripts/run-spoken-eval.ts",
+    "eval:fidelity": "tsx evaluation/scripts/run-fidelity-eval.ts",
+    "eval:tts:live": "tsx evaluation/scripts/run-tts-latency.ts"
+  },
+  "dependencies": {
+    "idb": "^8.0.3",
+    "next": "16.3.4",
+    "pdfjs-dist": "^6.3.289",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  }
+}
