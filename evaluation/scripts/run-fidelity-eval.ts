@@ -1,11 +1,15 @@
 /**
- * G4 — fidelity evaluation.
+ * G4a — critical literal preservation (machine-checkable half of fidelity).
  *
  * INDEPENDENT re-validation of the Listen output: it re-detects critical
  * literals in each segment's source text and checks preservation using only
  * persisted provenance (sourceText, spoken text, transformation records) —
  * deliberately NOT the runtime fidelity verdict — plus, for muted segments,
  * that no meaning-bearing token was silenced.
+ *
+ * Scope honesty: this proves literals survive, NOT that each transformation
+ * is semantically correct to say — that is G4b (human review packet,
+ * `npm run g4b:packet`; see ADR-005).
  *
  * Any violation means the gate FAILS and the process exits non-zero:
  * unsafe transformations block progression. Fallbacks are safe but count
@@ -213,7 +217,7 @@ async function main(): Promise<void> {
   const totalFallbacks = reports.reduce((a, r) => a + r.fallbacks, 0);
   const result = {
     generatedAt: new Date().toISOString(),
-    gate: "G4",
+    gate: "G4A_CRITICAL_LITERAL_PRESERVATION (semantic fidelity is G4b, human-reviewed)",
     pass: violations.length === 0,
     assertion:
       "No critical literal may vanish from a spoken segment without value-preserving coverage; no muted segment may carry legal meaning; no literal may be invented.",

@@ -1,5 +1,5 @@
 /**
- * Spoken-transformation evaluation (input to gate G3b).
+ * Spoken-transformation evaluation + ENGINEERING REGRESSION metric.
  *
  * Runs the deterministic engine over every fixture (reference documents, so
  * inputs are stable) and reports transformation activity: what rules fire,
@@ -7,9 +7,10 @@
  * where a Manual Gold file exists, the agreement between the engine and the
  * human-authored upper bound.
  *
- * Agreement is a lexical proxy (word-level Dice). It says "the machine
- * approach produced similar words", NOT "it sounds as good" — that judgment
- * is the human part of G3b (evaluation/results/g3b.csv).
+ * Agreement is word-level Dice: a regression alarm for engineers. It cannot
+ * hear, and it deliberately penalizes orally-correct surface changes. It is
+ * NOT an experience proxy and NEVER evidence for G3B_HUMAN — that decision
+ * belongs to the capture-ratio protocol in docs/phase-0.md.
  *
  * Run: npm run eval:spoken
  */
@@ -103,7 +104,7 @@ async function main(): Promise<void> {
   const withGold = fixtures.filter((f) => f.goldAgreement.entries > 0);
   const result = {
     generatedAt: new Date().toISOString(),
-    gate: "G3b (automatic proxy component)",
+    gate: "G3B_AUTOMATION_PROXY (engineering regression only — never an experience proxy)",
     question:
       "How much of the Manual Gold improvement does the deterministic engine capture? (lexical agreement only; human A/B still required)",
     fixtures,

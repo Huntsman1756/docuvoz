@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-02T06:28:03.464Z",
-  "gate": "G2",
+  "generatedAt": "2026-09-02T07:33:06.900Z",
+  "gate": "G2-SMOKE (synthetic references; G2_EXTRACTION_REAL remains OPEN)",
   "question": "How much semantic structure survives browser extraction vs the reference export?",
   "caveat": "Reference exports are synthetic Docling-shaped files produced by the fixture generator (upper bound of what a desktop parser should recover). Real-Docling benchmarking on legally-held PDFs is documented in evaluation/corpus/README.md.",
   "fixtures": [

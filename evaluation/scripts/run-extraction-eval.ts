@@ -1,9 +1,13 @@
 /**
- * G2 — extraction evaluation.
+ * Synthetic extraction SMOKE TEST — does NOT close gate G2.
  *
  * Compares the browser extraction pipeline (pdf.js + heuristics) against the
  * reference (Docling-shaped) export for each corpus fixture, answering:
  * how much structure survives the move to interactive client-side parsing?
+ *
+ * High word recall here can still hide the failure that matters (content
+ * present in semantically wrong order). G2_EXTRACTION_REAL requires the
+ * five real-document benchmark described in docs/phase-0.md.
  *
  * Run: npm run eval:extraction
  */
@@ -188,7 +192,7 @@ async function main(): Promise<void> {
   }
   const result = {
     generatedAt: new Date().toISOString(),
-    gate: "G2",
+    gate: "G2-SMOKE (synthetic references; G2_EXTRACTION_REAL remains OPEN)",
     question:
       "How much semantic structure survives browser extraction vs the reference export?",
     caveat:

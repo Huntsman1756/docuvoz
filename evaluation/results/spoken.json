@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-02T06:28:03.975Z",
-  "gate": "G3b (automatic proxy component)",
+  "generatedAt": "2026-09-02T07:33:07.396Z",
+  "gate": "G3B_AUTOMATION_PROXY (engineering regression only — never an experience proxy)",
   "question": "How much of the Manual Gold improvement does the deterministic engine capture? (lexical agreement only; human A/B still required)",
   "fixtures": [
     {
