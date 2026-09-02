@@ -1,0 +1,292 @@
+{
+  "generatedAt": "2026-09-02T07:26:27.666Z",
+  "evidenceKind": "WIRING-SELF-TEST (mock provider) — NEVER cite as G1 evidence",
+  "provider": "mock",
+  "model": "kokoro",
+  "voice": "ef_dora",
+  "format": "mp3",
+  "durationMeasurability": "null for non-WAV containers — never guessed; set NAN_TTS_FORMAT=wav for full RTF",
+  "pacing": {
+    "maxConcurrency": 1,
+    "requestsPerMinute": 20,
+    "minIntervalMs": 3000,
+    "maxAttempts": 3
+  },
+  "gates": {
+    "G1_PROVIDER_CONNECTIVITY": "NOT_MEASURABLE(mock)",
+    "G1_PROVIDER_LATENCY": "NOT_MEASURABLE(mock)",
+    "G1_PROVIDER_RATE_BEHAVIOR": "NOT_MEASURABLE(mock)"
+  },
+  "sampleMetrics": {
+    "requested": 12,
+    "successes": 12,
+    "failures": 0,
+    "ttfaFirstAttemptP50Ms": null,
+    "ttfaFirstAttemptP95Ms": null,
+    "wireLatencyP50Ms": 156,
+    "wireLatencyP95Ms": 166,
+    "totalIncludingPacingP50Ms": 3004,
+    "queueWaitP95Ms": 2858,
+    "retriesTotal": 0,
+    "wireRequests": 0,
+    "count429WireLevel": 0,
+    "audioSecondsTotal": 190.54,
+    "rtfP50": 0.01,
+    "bytesTotal": 3049168
+  },
+  "records": [
+    {
+      "label": "nested-regulation-01:short:c7",
+      "chars": 113,
+      "ok": true,
+      "totalMs": 166,
+      "queueWaitMs": 0,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 166,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 113644,
+      "audioMs": 7100,
+      "rtf": 0.023,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:mid:c1",
+      "chars": 171,
+      "ok": true,
+      "totalMs": 2999,
+      "queueWaitMs": 2843,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 156,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 166444,
+      "audioMs": 10400,
+      "rtf": 0.015,
+      "error": null
+    },
+    {
+      "label": "financial-report-01:mid:c1",
+      "chars": 193,
+      "ok": true,
+      "totalMs": 3004,
+      "queueWaitMs": 2849,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 155,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 186764,
+      "audioMs": 11670,
+      "rtf": 0.013,
+      "error": null
+    },
+    {
+      "label": "financial-report-01:mid:c3",
+      "chars": 151,
+      "ok": true,
+      "totalMs": 3005,
+      "queueWaitMs": 2850,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 155,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 150924,
+      "audioMs": 9430,
+      "rtf": 0.016,
+      "error": null
+    },
+    {
+      "label": "extraction-artifacts-01:mid:c1",
+      "chars": 260,
+      "ok": true,
+      "totalMs": 3008,
+      "queueWaitMs": 2853,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 155,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 254924,
+      "audioMs": 15930,
+      "rtf": 0.01,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c0",
+      "chars": 350,
+      "ok": true,
+      "totalMs": 3002,
+      "queueWaitMs": 2845,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 157,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 320044,
+      "audioMs": 20000,
+      "rtf": 0.008,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c2",
+      "chars": 349,
+      "ok": true,
+      "totalMs": 3014,
+      "queueWaitMs": 2858,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 156,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 320044,
+      "audioMs": 20000,
+      "rtf": 0.008,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c3",
+      "chars": 261,
+      "ok": true,
+      "totalMs": 3013,
+      "queueWaitMs": 2857,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 156,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 256204,
+      "audioMs": 16010,
+      "rtf": 0.01,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c5",
+      "chars": 364,
+      "ok": true,
+      "totalMs": 3003,
+      "queueWaitMs": 2847,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 156,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 320044,
+      "audioMs": 20000,
+      "rtf": 0.008,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c6",
+      "chars": 359,
+      "ok": true,
+      "totalMs": 3000,
+      "queueWaitMs": 2845,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 155,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 320044,
+      "audioMs": 20000,
+      "rtf": 0.008,
+      "error": null
+    },
+    {
+      "label": "financial-report-01:long:c2",
+      "chars": 391,
+      "ok": true,
+      "totalMs": 3012,
+      "queueWaitMs": 2856,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 156,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 320044,
+      "audioMs": 20000,
+      "rtf": 0.008,
+      "error": null
+    },
+    {
+      "label": "extraction-artifacts-01:long:c0",
+      "chars": 346,
+      "ok": true,
+      "totalMs": 3003,
+      "queueWaitMs": 2848,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 155,
+      "firstAttemptTtfaMs": null,
+      "successfulTtfaMs": null,
+      "statusCodes": [
+        null
+      ],
+      "retryAfterSeen": [],
+      "bytes": 320044,
+      "audioMs": 20000,
+      "rtf": 0.008,
+      "error": null
+    }
+  ],
+  "burn": null
+}

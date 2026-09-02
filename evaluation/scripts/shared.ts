@@ -153,6 +153,36 @@ export function percentile(values: number[], p: number): number | null {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
 }
 
+/**
+ * Exact duration of a PCM WAV from its RIFF chunks (walks `fmt `/`data`
+ * instead of trusting a fixed 44-byte header). Returns null for anything
+ * not decodable as WAV — durations for opaque containers are never guessed.
+ */
+export function readWavDurationMs(bytes: Uint8Array): number | null {
+  if (bytes.length < 12) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tag = (o: number) =>
+    String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]);
+  if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
+  let byteRate = 0;
+  let dataSize = 0;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = tag(offset);
+    const size = view.getUint32(offset + 4, true);
+    if (id === "fmt " && offset + 20 <= bytes.length) {
+      byteRate = view.getUint32(offset + 16, true);
+    } else if (id === "data") {
+      dataSize = Math.min(size, bytes.length - offset - 8);
+    }
+    offset += 8 + size + (size % 2);
+  }
+  if (byteRate > 0 && dataSize > 0) {
+    return Math.round((dataSize / byteRate) * 1000);
+  }
+  return null;
+}
+
 export function writeResult(name: string, payload: unknown): string {
   const dir = join(ROOT, "evaluation", "results");
   mkdirSync(dir, { recursive: true });
