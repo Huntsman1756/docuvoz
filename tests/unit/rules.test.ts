@@ -82,6 +82,26 @@ describe("legal references", () => {
       "en el artículo cinco, apartado dos del texto refundido",
     );
   });
+  it("G4b: restores the heading boundary swallowed after a citation", () => {
+    expect(one(articleRule, "Artículo 1. Objeto. La presente")).toBe(
+      "artículo uno. Objeto. La presente",
+    );
+    expect(one(articleRule, "Artículo 2. Ámbito de aplicación.")).toBe(
+      "artículo dos. Ámbito de aplicación.",
+    );
+    expect(one(articleRule, "Artículo 5. Información periódica.")).toBe(
+      "artículo cinco. Información periódica.",
+    );
+  });
+  it("G4b: keeps the sentence period at segment end", () => {
+    expect(one(articleRule, "véase el art. 15.")).toBe("véase el artículo quince.");
+  });
+  it("G4b: keeps plural form in joint references", () => {
+    expect(run("de conformidad con lo establecido en los artículos 121 y 122 de la ley")).toBe(
+      "de conformidad con lo establecido en los artículos ciento veintiuno y ciento veintidós de la ley",
+    );
+    expect(run("arts. 10 a 12")).toBe("artículos diez a doce");
+  });
   it("keyword + roman numeral", () => {
     expect(one(keywordReferenceRule, "sección (IV) ")).toBe("sección cuatro ");
   });

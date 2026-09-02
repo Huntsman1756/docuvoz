@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T07:33:07.396Z",
+  "generatedAt": "2026-09-02T08:36:58.840Z",
   "gate": "G3B_AUTOMATION_PROXY (engineering regression only — never an experience proxy)",
   "question": "How much of the Manual Gold improvement does the deterministic engine capture? (lexical agreement only; human A/B still required)",
   "fixtures": [
@@ -58,13 +58,13 @@
       },
       "goldAgreement": {
         "entries": 5,
-        "meanSimilarity": 0.95,
+        "meanSimilarity": 0.951,
         "exactMatches": 1,
         "details": [
           {
             "blockId": "b5",
-            "similarity": 0.921,
-            "listen": "artículo dosÁmbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra be de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el B O E número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres.",
+            "similarity": 0.929,
+            "listen": "artículo dos. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra be de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el B O E número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres.",
             "gold": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra b, de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el Boletín Oficial del Estado número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres."
           },
           {
@@ -210,7 +210,7 @@
     }
   ],
   "summary": {
-    "meanGoldAgreement": 0.95,
+    "meanGoldAgreement": 0.951,
     "totalRejected": 0
   }
 }

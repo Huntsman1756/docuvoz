@@ -82,7 +82,7 @@ export const articleRule: SpokenRule = regexRule(
   true,
   /\b(arts?\.|Art(?:[íi]cul[oa]s?)?\.?)\s+(\d+(?:\.\d+){0,2})(?:([.)])\s*)?(?:\(\s*([a-zñ])\s*\)|([a-zñ])\))?/gi,
   (m) => {
-    const keyword = /^arts/i.test(m[1]) ? "artículos" : "artículo";
+    const keyword = /s$/i.test(m[1].replace(/\.$/, "")) ? "artículos" : "artículo";
     const levels = m[2].split(".");
     const parts: string[] = [];
     for (let i = 0; i < levels.length; i++) {
@@ -98,7 +98,14 @@ export const articleRule: SpokenRule = regexRule(
       if (name === null) return null;
       parts.push(`letra ${name}`);
     }
-    return parts.join(", ");
+    // The match may swallow the sentence-closing ". " (e.g. heading
+    // "Artículo 1. Objeto."). That boundary is structural: re-emit it, but
+    // never when the period belonged to the citation spine ("57.1.b)").
+    const citation = parts.join(", ");
+    if (m[3] === "." && letter === undefined) {
+      return /\s$/.test(m[0]) ? `${citation}. ` : `${citation}.`;
+    }
+    return citation;
   },
 );
 
