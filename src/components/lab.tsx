@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StructuredDocument } from "@/domain/documents/types";
 import type { GoldEntry, SpokenPlan, SpokenSegment } from "@/domain/spoken/types";
@@ -213,6 +214,9 @@ export function Lab() {
           </p>
         </div>
         <div className="provider">
+          <Link href="/" className="chip">
+            ← Lector
+          </Link>
           {health ? (
             <span className={health.provider === "nan" ? "badge badge-warn" : "badge"}>
               provider: {health.provider} ({health.model})

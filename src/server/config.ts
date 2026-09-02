@@ -8,10 +8,18 @@ import { NanSpeechProvider } from "@/adapters/speech-providers/nan-provider";
 import { PacedProvider } from "@/adapters/speech-providers/pacing";
 import type { SpeechProvider } from "@/domain/speech/types";
 
+// A blank line in `.env` (`KEY=`) yields an empty string, not undefined. Without
+// this coercion the verbatim `.env.example -> .env.local` copy fails validation
+// even in mock mode (onboarding bug found dogfooding). Treat blank as "unset".
+const blankToUndefined = (v: unknown) => (v === "" || v === undefined ? undefined : v);
+
 const EnvSchema = z.object({
   SPEECH_PROVIDER: z.enum(["mock", "nan"]).default("mock"),
-  NAN_BASE_URL: z.string().url().optional(),
-  NAN_API_KEY: z.string().min(8, "NAN_API_KEY looks too short").optional(),
+  NAN_BASE_URL: z.preprocess(blankToUndefined, z.string().url().optional()),
+  NAN_API_KEY: z.preprocess(
+    blankToUndefined,
+    z.string().min(8, "NAN_API_KEY looks too short").optional(),
+  ),
   NAN_TTS_MODEL: z.string().default("kokoro"),
   NAN_TTS_VOICE: z.string().default("ef_dora"),
   NAN_TTS_FORMAT: z.string().default("mp3"),

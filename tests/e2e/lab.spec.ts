@@ -5,8 +5,18 @@
  */
 import { expect, test } from "@playwright/test";
 
-test("fixture load -> Listen normalization -> play -> highlight", async ({ page }) => {
+test("personal reader lands at / and links to the lab", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Lector de documentos" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Selecciona tu PDF", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: /Modo laboratorio/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /AUIDIO NAN/ })).toBeVisible();
+});
+
+test("fixture load -> Listen normalization -> play -> highlight", async ({ page }) => {
+  await page.goto("/lab");
   await expect(page.getByText("provider: mock")).toBeVisible();
 
   // Load the nested-regulation fixture through the real browser PDF pipeline.
@@ -52,7 +62,7 @@ test("fixture load -> Listen normalization -> play -> highlight", async ({ page 
 });
 
 test("uploaded PDF is parsed entirely client-side", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   const pdf = await page.request.get("/corpus/pdfs/simple-01.pdf");
   const body = await pdf.body();
   await page.locator('input[type="file"]').setInputFiles({
@@ -66,7 +76,7 @@ test("uploaded PDF is parsed entirely client-side", async ({ page }) => {
 });
 
 test("non-PDF upload is rejected before parsing", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   await page.locator('input[type="file"]').setInputFiles({
     name: "notes.txt",
     mimeType: "text/plain",
@@ -78,7 +88,7 @@ test("non-PDF upload is rejected before parsing", async ({ page }) => {
 });
 
 test("PDF magic bytes are enforced", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   await page.locator('input[type="file"]').setInputFiles({
     name: "renamed.txt",
     mimeType: "",
@@ -90,7 +100,7 @@ test("PDF magic bytes are enforced", async ({ page }) => {
 });
 
 test("Listen mode exposes engine stats and fallback semantics", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/lab");
   await page.getByRole("button", { name: "Circular ficticia 1/2024" }).click();
   const list = page.getByTestId("doc-list");
   await expect(list).toBeVisible({ timeout: 30_000 });

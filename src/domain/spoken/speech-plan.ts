@@ -6,10 +6,17 @@ import type { SpeechChunk, SpokenPlan } from "./types";
  * then whitespace.
  */
 export const DEFAULT_MAX_CHUNK_CHARS = 400;
-
+/**
+ * Optional lower bound. When > 0, a chunk shorter than `minChars` is folded into
+ * its neighbour if that keeps it within `maxChars`. This avoids the "many tiny
+ * chunks" case where the TTS prosody resets every few words and the production
+ * cadence can out-run the audio — the marginal regime flagged by the harness.
+ * Defaults to 0 so existing (engine/G3a) chunking is byte-for-byte unchanged.
+ */
 export function planChunks(
   plan: SpokenPlan,
   maxChars: number = DEFAULT_MAX_CHUNK_CHARS,
+  minChars = 0,
 ): SpeechChunk[] {
   const chunks: SpeechChunk[] = [];
   let current = "";
@@ -40,7 +47,23 @@ export function planChunks(
     }
   }
   flush();
-  return chunks;
+  if (minChars <= 1) return chunks;
+  const merged: SpeechChunk[] = [];
+  for (const c of chunks) {
+    const prev = merged[merged.length - 1];
+    const tinyNeighbour =
+      prev != null && (prev.text.length < minChars || c.text.length < minChars);
+    if (tinyNeighbour && prev.text.length + 1 + c.text.length <= maxChars) {
+      merged[merged.length - 1] = {
+        id: prev.id,
+        text: `${prev.text} ${c.text}`,
+        segmentIds: [...prev.segmentIds, ...c.segmentIds],
+      };
+    } else {
+      merged.push(c);
+    }
+  }
+  return merged.map((c, i) => ({ ...c, id: `c${i}` }));
 }
 
 function splitLong(text: string, maxChars: number): string[] {

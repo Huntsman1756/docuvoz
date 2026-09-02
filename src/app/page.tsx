@@ -1,5 +1,5 @@
-import { Lab } from "@/components/lab";
+import { Reader } from "@/components/reader";
 
 export default function Home() {
-  return <Lab />;
+  return <Reader />;
 }
