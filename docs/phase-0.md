@@ -18,7 +18,7 @@ Updated whenever evidence changes. Last measured: 2026-09-02.
 
 ```text
 PHASE_0_INFRASTRUCTURE        = PASS   (builds, tests, gates runnable offline)
-G1_TTS_LIVE                   = OPEN   (no provider credentials in this environment)
+G1_TTS_LIVE                   = PASS   (NaN live run; scope-limited — see below)
 G2_EXTRACTION_REAL            = OPEN   (only synthetic smoke evidence so far)
 G3A_PRODUCT_HYPOTHESIS        = OPEN   (blind listening protocol prepared, not run)
 G3B_AUTOMATION_PROXY          = PASS   (engineering regression metric ONLY — see below)
@@ -38,6 +38,17 @@ What each PASS is allowed to mean, and nothing more:
   penalizes orally-correct surface changes and cannot hear anything. It is
   **not** evidence about listening experience and must never be cited as
   "the engine captures 95% of the benefit".
+- `G1_TTS_LIVE = PASS` — measured 2026-09-02 against NaN cloud (kokoro,
+  `ef_dora`, WAV, serial at the provider's published 15 rpm kokoro cap):
+  12/12 real stratified chunks successful — TTFA p50/p95/max 0.93/1.63/1.63 s,
+  wire latency p50/p95 1.01/1.77 s, RTF p50/p95 0.076/0.157, queue wait
+  p50/p95 2.98/3.31 s (deliberate pacing, not provider slowness), 0 retries,
+  0 provider errors, 0 HTTP 429/5xx — plus a sustained burn of 30 requests
+  over 120 s with zero 429s. Evidence: `evaluation/results/tts.json`.
+  Establishes only that the transport is suitable for Phase 0 interactive TTS
+  validation. Does **not** establish production SLA, multi-user capacity,
+  third-party serving rights, production suitability of NaN, or behavior
+  above 15 rpm.
 - `G4A = PASS` — critical literals (numbers, dates, amounts, identifiers,
   legal qualifications) provably survive Listen transformations on the
   evaluated corpus. This is literal preservation only. Semantic faithfulness
@@ -46,8 +57,6 @@ What each PASS is allowed to mean, and nothing more:
 
 What remains OPEN and why no technical green checkmark can close it:
 
-- `G1_TTS_LIVE` — needs real provider runs (connectivity + latency + rate
-  behavior). Mock measurements are excluded by design.
 - `G2_EXTRACTION_REAL` — the synthetic corpus measures the _browser pipeline
   loss_, not performance on real regulatory PDFs. Synthetic numbers
   (`tables 0/2`, `footnote 0/1`, ~100% recall) are a smoke test: word recall

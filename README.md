@@ -107,7 +107,7 @@ table in [docs/phase-0.md](docs/phase-0.md):
 
 ```text
 PHASE_0_INFRASTRUCTURE        = PASS   builds/tests/gates runnable offline
-G1_TTS_LIVE                   = OPEN   no provider credentials in this environment
+G1_TTS_LIVE                   = PASS   NaN live 15rpm: 12/12 ok, TTFA p95 1.63s, 0×429 (tts.json)
 G2_EXTRACTION_REAL            = OPEN   synthetic smoke only (tables 0/2, footnote 0/1)
 G3A_PRODUCT_HYPOTHESIS        = OPEN   blind protocol prepared, ears required
 G3B_AUTOMATION_PROXY          = PASS   word-level Dice 0.95 — engineering regression ONLY

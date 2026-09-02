@@ -1,0 +1,306 @@
+{
+  "generatedAt": "2026-09-02T08:07:14.996Z",
+  "evidenceKind": "G1 transport/latency evidence (provider suitability for product use remains a documented human decision)",
+  "provider": "nan",
+  "model": "kokoro",
+  "voice": "ef_dora",
+  "format": "wav",
+  "durationMeasurability": "exact (RIFF header)",
+  "pacing": {
+    "maxConcurrency": 1,
+    "requestsPerMinute": 15,
+    "minIntervalMs": 4000,
+    "maxAttempts": 3
+  },
+  "gates": {
+    "G1_PROVIDER_CONNECTIVITY": "PASS",
+    "G1_PROVIDER_LATENCY": "MEASURED — accept/reject is a human decision on the distribution below",
+    "G1_PROVIDER_RATE_BEHAVIOR": "PASS at configured pace (0 wire-level 429 — rerun with larger burn near the plan cap for full confidence)"
+  },
+  "sampleMetrics": {
+    "requested": 12,
+    "successes": 12,
+    "failures": 0,
+    "ttfaFirstAttemptP50Ms": 971,
+    "ttfaFirstAttemptP95Ms": 1628,
+    "wireLatencyP50Ms": 1007,
+    "wireLatencyP95Ms": 1769,
+    "totalIncludingPacingP50Ms": 3936,
+    "queueWaitP95Ms": 3313,
+    "retriesTotal": 0,
+    "wireRequests": 42,
+    "count429WireLevel": 0,
+    "audioSecondsTotal": 192.419,
+    "rtfP50": 0.079,
+    "bytesTotal": 9237014
+  },
+  "records": [
+    {
+      "label": "nested-regulation-01:short:c7",
+      "chars": 113,
+      "ok": true,
+      "totalMs": 1032,
+      "queueWaitMs": 1,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1031,
+      "firstAttemptTtfaMs": 865,
+      "successfulTtfaMs": 865,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 315608,
+      "audioMs": 6574,
+      "rtf": 0.157,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:mid:c1",
+      "chars": 171,
+      "ok": true,
+      "totalMs": 3805,
+      "queueWaitMs": 2975,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 830,
+      "firstAttemptTtfaMs": 744,
+      "successfulTtfaMs": 744,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 506044,
+      "audioMs": 10541,
+      "rtf": 0.079,
+      "error": null
+    },
+    {
+      "label": "financial-report-01:mid:c1",
+      "chars": 193,
+      "ok": true,
+      "totalMs": 4146,
+      "queueWaitMs": 3184,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 962,
+      "firstAttemptTtfaMs": 925,
+      "successfulTtfaMs": 925,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 521628,
+      "audioMs": 10866,
+      "rtf": 0.089,
+      "error": null
+    },
+    {
+      "label": "financial-report-01:mid:c3",
+      "chars": 151,
+      "ok": true,
+      "totalMs": 3748,
+      "queueWaitMs": 3051,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 697,
+      "firstAttemptTtfaMs": 669,
+      "successfulTtfaMs": 669,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 437892,
+      "audioMs": 9121,
+      "rtf": 0.076,
+      "error": null
+    },
+    {
+      "label": "extraction-artifacts-01:mid:c1",
+      "chars": 260,
+      "ok": true,
+      "totalMs": 5014,
+      "queueWaitMs": 3313,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1701,
+      "firstAttemptTtfaMs": 1628,
+      "successfulTtfaMs": 1628,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 695578,
+      "audioMs": 14490,
+      "rtf": 0.117,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c0",
+      "chars": 350,
+      "ok": true,
+      "totalMs": 4075,
+      "queueWaitMs": 2306,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1769,
+      "firstAttemptTtfaMs": 1411,
+      "successfulTtfaMs": 1411,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 1003568,
+      "audioMs": 20906,
+      "rtf": 0.085,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c2",
+      "chars": 349,
+      "ok": true,
+      "totalMs": 3250,
+      "queueWaitMs": 2243,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1007,
+      "firstAttemptTtfaMs": 971,
+      "successfulTtfaMs": 971,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 957976,
+      "audioMs": 19956,
+      "rtf": 0.05,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c3",
+      "chars": 261,
+      "ok": true,
+      "totalMs": 4674,
+      "queueWaitMs": 2997,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1677,
+      "firstAttemptTtfaMs": 1588,
+      "successfulTtfaMs": 1588,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 741972,
+      "audioMs": 15456,
+      "rtf": 0.109,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c5",
+      "chars": 364,
+      "ok": true,
+      "totalMs": 3280,
+      "queueWaitMs": 2336,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 944,
+      "firstAttemptTtfaMs": 911,
+      "successfulTtfaMs": 911,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 1014806,
+      "audioMs": 21140,
+      "rtf": 0.045,
+      "error": null
+    },
+    {
+      "label": "nested-regulation-01:long:c6",
+      "chars": 359,
+      "ok": true,
+      "totalMs": 3905,
+      "queueWaitMs": 3060,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 845,
+      "firstAttemptTtfaMs": 811,
+      "successfulTtfaMs": 811,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 1043156,
+      "audioMs": 21731,
+      "rtf": 0.039,
+      "error": null
+    },
+    {
+      "label": "financial-report-01:long:c2",
+      "chars": 391,
+      "ok": true,
+      "totalMs": 4248,
+      "queueWaitMs": 3168,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1080,
+      "firstAttemptTtfaMs": 1045,
+      "successfulTtfaMs": 1045,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 1097188,
+      "audioMs": 22856,
+      "rtf": 0.047,
+      "error": null
+    },
+    {
+      "label": "extraction-artifacts-01:long:c0",
+      "chars": 346,
+      "ok": true,
+      "totalMs": 3936,
+      "queueWaitMs": 2929,
+      "attempts": 1,
+      "retries": 0,
+      "backoffGapsMs": [],
+      "successfulAttemptWireMs": 1007,
+      "firstAttemptTtfaMs": 978,
+      "successfulTtfaMs": 978,
+      "statusCodes": [
+        200
+      ],
+      "retryAfterSeen": [],
+      "bytes": 901598,
+      "audioMs": 18782,
+      "rtf": 0.054,
+      "error": null
+    }
+  ],
+  "burn": {
+    "requests": 30,
+    "successes": 30,
+    "failures": 0,
+    "wireRequests": 30,
+    "count429": 0,
+    "count5xx": 0,
+    "retriesTotal": 0,
+    "retryAfterSeen": [],
+    "latencyMinMs": 2952,
+    "latencyMaxMs": 4969,
+    "wallClockMs": 120003,
+    "effectiveRequestsPerMinute": 15,
+    "note": "PASS evidence for G1_PROVIDER_RATE_BEHAVIOR is: count429 = 0 across a burn at least as long as one plan minute window, matching the provider's published Kokoro-plan cap (documented in docs/providers.md)."
+  }
+}
