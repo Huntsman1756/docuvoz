@@ -1,0 +1,216 @@
+{
+  "generatedAt": "2026-09-02T06:28:03.975Z",
+  "gate": "G3b (automatic proxy component)",
+  "question": "How much of the Manual Gold improvement does the deterministic engine capture? (lexical agreement only; human A/B still required)",
+  "fixtures": [
+    {
+      "fixtureId": "nested-regulation-01",
+      "category": "nested-regulation",
+      "stats": {
+        "blocksTotal": 26,
+        "segments": 17,
+        "mutedNoise": 9,
+        "transformed": 16,
+        "unchanged": 1,
+        "rejected": 0,
+        "ruleHits": {
+          "slash-citations": 2,
+          "numbers": 18,
+          "pause": 4,
+          "roman-headings": 3,
+          "legal-references": 4,
+          "abbreviations": 1,
+          "acronyms": 1,
+          "keyword-references": 3,
+          "percentages": 2,
+          "dates": 1,
+          "ordinals": 2,
+          "time": 1,
+          "currencies": 3,
+          "basis-points": 1,
+          "settlement": 1,
+          "dates-hyphen": 1
+        }
+      },
+      "transformedRatio": 0.941,
+      "rejectedRatio": 0,
+      "ruleHits": {
+        "slash-citations": 2,
+        "numbers": 18,
+        "pause": 4,
+        "roman-headings": 3,
+        "legal-references": 4,
+        "abbreviations": 1,
+        "acronyms": 1,
+        "keyword-references": 3,
+        "percentages": 2,
+        "dates": 1,
+        "ordinals": 2,
+        "time": 1,
+        "currencies": 3,
+        "basis-points": 1,
+        "settlement": 1,
+        "dates-hyphen": 1
+      },
+      "ruleCoverage": {
+        "fired": 16,
+        "total": 21
+      },
+      "goldAgreement": {
+        "entries": 5,
+        "meanSimilarity": 0.95,
+        "exactMatches": 1,
+        "details": [
+          {
+            "blockId": "b5",
+            "similarity": 0.921,
+            "listen": "artículo dosÁmbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra be de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el B O E número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres.",
+            "gold": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra b, de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el Boletín Oficial del Estado número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres."
+          },
+          {
+            "blockId": "b6",
+            "similarity": 1,
+            "listen": "No obstante, quedarán exentas las entidades a que se refiere el apartado tres, salvo que superen un ratio de solvencia del ocho coma cinco por ciento durante dos ejercicios consecutivos.",
+            "gold": "No obstante, quedarán exentas las entidades a que se refiere el apartado tres, salvo que superen un ratio de solvencia del ocho coma cinco por ciento durante dos ejercicios consecutivos."
+          },
+          {
+            "blockId": "b12",
+            "similarity": 0.963,
+            "listen": "primero. Las entidades deberán remitir la información antes del día quince de julio de dos mil veinticuatro y, a más tardar, a las catorce horas, hora peninsular.",
+            "gold": "Punto primero. Las entidades deberán remitir la información antes del quince de julio de dos mil veinticuatro y, a más tardar, a las catorce horas, hora peninsular."
+          },
+          {
+            "blockId": "b13",
+            "similarity": 0.979,
+            "listen": "a) El umbral máximo será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos.",
+            "gold": "Letra a. El umbral máximo será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos."
+          },
+          {
+            "blockId": "b15",
+            "similarity": 0.886,
+            "listen": "segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de T más dos días hábiles, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro.",
+            "gold": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+          }
+        ]
+      }
+    },
+    {
+      "fixtureId": "financial-report-01",
+      "category": "financial",
+      "stats": {
+        "blocksTotal": 10,
+        "segments": 7,
+        "mutedNoise": 3,
+        "transformed": 7,
+        "unchanged": 0,
+        "rejected": 0,
+        "ruleHits": {
+          "numbers": 4,
+          "pause": 1,
+          "percentages": 3,
+          "currencies": 3,
+          "isin": 1,
+          "settlement": 1,
+          "ranges": 1,
+          "lei": 1,
+          "acronyms": 1
+        }
+      },
+      "transformedRatio": 1,
+      "rejectedRatio": 0,
+      "ruleHits": {
+        "numbers": 4,
+        "pause": 1,
+        "percentages": 3,
+        "currencies": 3,
+        "isin": 1,
+        "settlement": 1,
+        "ranges": 1,
+        "lei": 1,
+        "acronyms": 1
+      },
+      "ruleCoverage": {
+        "fired": 9,
+        "total": 21
+      },
+      "goldAgreement": {
+        "entries": 0,
+        "meanSimilarity": null,
+        "exactMatches": 0,
+        "details": []
+      }
+    },
+    {
+      "fixtureId": "extraction-artifacts-01",
+      "category": "extraction-artifacts",
+      "stats": {
+        "blocksTotal": 11,
+        "segments": 5,
+        "mutedNoise": 6,
+        "transformed": 3,
+        "unchanged": 2,
+        "rejected": 0,
+        "ruleHits": {
+          "pause": 2,
+          "legal-references": 1,
+          "slash-citations": 1,
+          "numbers": 3
+        }
+      },
+      "transformedRatio": 0.6,
+      "rejectedRatio": 0,
+      "ruleHits": {
+        "pause": 2,
+        "legal-references": 1,
+        "slash-citations": 1,
+        "numbers": 3
+      },
+      "ruleCoverage": {
+        "fired": 4,
+        "total": 21
+      },
+      "goldAgreement": {
+        "entries": 0,
+        "meanSimilarity": null,
+        "exactMatches": 0,
+        "details": []
+      }
+    },
+    {
+      "fixtureId": "simple-01",
+      "category": "native-simple",
+      "stats": {
+        "blocksTotal": 6,
+        "segments": 4,
+        "mutedNoise": 2,
+        "transformed": 2,
+        "unchanged": 2,
+        "rejected": 0,
+        "ruleHits": {
+          "pause": 1,
+          "numbers": 3
+        }
+      },
+      "transformedRatio": 0.5,
+      "rejectedRatio": 0,
+      "ruleHits": {
+        "pause": 1,
+        "numbers": 3
+      },
+      "ruleCoverage": {
+        "fired": 2,
+        "total": 21
+      },
+      "goldAgreement": {
+        "entries": 0,
+        "meanSimilarity": null,
+        "exactMatches": 0,
+        "details": []
+      }
+    }
+  ],
+  "summary": {
+    "meanGoldAgreement": 0.95,
+    "totalRejected": 0
+  }
+}

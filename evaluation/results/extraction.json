@@ -1,0 +1,163 @@
+{
+  "generatedAt": "2026-09-02T06:28:03.464Z",
+  "gate": "G2",
+  "question": "How much semantic structure survives browser extraction vs the reference export?",
+  "caveat": "Reference exports are synthetic Docling-shaped files produced by the fixture generator (upper bound of what a desktop parser should recover). Real-Docling benchmarking on legally-held PDFs is documented in evaluation/corpus/README.md.",
+  "fixtures": [
+    {
+      "fixtureId": "nested-regulation-01",
+      "category": "nested-regulation",
+      "referenceBlocks": 17,
+      "browserBlocks": 23,
+      "textFidelity": 1,
+      "contentRecall": 1,
+      "pageAccuracy": 1,
+      "readingOrderMonotonic": true,
+      "headingDetection": {
+        "reference": 4,
+        "recovered": 4
+      },
+      "listDetection": {
+        "reference": 2,
+        "recovered": 2
+      },
+      "footnoteDetection": {
+        "reference": 1,
+        "recovered": 0
+      },
+      "tableCells": {
+        "reference": 2,
+        "recovered": 0
+      },
+      "chromeClassification": {
+        "reference": 9,
+        "recovered": 3
+      },
+      "provenanceCoverage": 1,
+      "missed": [],
+      "misclassified": [
+        {
+          "text": "Concepto: Fondo para intermedios financieros. Importe: 3.500",
+          "expected": "table-cell",
+          "got": "paragraph"
+        },
+        {
+          "text": "Concepto: Comisiones variables. Importe: 12,75 % del resulta",
+          "expected": "table-cell",
+          "got": "paragraph"
+        },
+        {
+          "text": "(1) Los porcentajes se calcularán sobre el balance auditado ",
+          "expected": "footnote",
+          "got": "list-item"
+        }
+      ]
+    },
+    {
+      "fixtureId": "financial-report-01",
+      "category": "financial",
+      "referenceBlocks": 7,
+      "browserBlocks": 9,
+      "textFidelity": 0.996,
+      "contentRecall": 1,
+      "pageAccuracy": 1,
+      "readingOrderMonotonic": true,
+      "headingDetection": {
+        "reference": 1,
+        "recovered": 1
+      },
+      "listDetection": {
+        "reference": 2,
+        "recovered": 2
+      },
+      "footnoteDetection": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "tableCells": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "chromeClassification": {
+        "reference": 3,
+        "recovered": 1
+      },
+      "provenanceCoverage": 1,
+      "missed": [],
+      "misclassified": []
+    },
+    {
+      "fixtureId": "extraction-artifacts-01",
+      "category": "extraction-artifacts",
+      "referenceBlocks": 5,
+      "browserBlocks": 9,
+      "textFidelity": 1,
+      "contentRecall": 1,
+      "pageAccuracy": 1,
+      "readingOrderMonotonic": true,
+      "headingDetection": {
+        "reference": 2,
+        "recovered": 2
+      },
+      "listDetection": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "footnoteDetection": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "tableCells": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "chromeClassification": {
+        "reference": 6,
+        "recovered": 2
+      },
+      "provenanceCoverage": 1,
+      "missed": [],
+      "misclassified": []
+    },
+    {
+      "fixtureId": "simple-01",
+      "category": "native-simple",
+      "referenceBlocks": 4,
+      "browserBlocks": 6,
+      "textFidelity": 1,
+      "contentRecall": 1,
+      "pageAccuracy": 1,
+      "readingOrderMonotonic": true,
+      "headingDetection": {
+        "reference": 1,
+        "recovered": 1
+      },
+      "listDetection": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "footnoteDetection": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "tableCells": {
+        "reference": 0,
+        "recovered": 0
+      },
+      "chromeClassification": {
+        "reference": 2,
+        "recovered": 2
+      },
+      "provenanceCoverage": 1,
+      "missed": [],
+      "misclassified": []
+    }
+  ],
+  "summary": {
+    "meanTextFidelity": 0.999,
+    "meanContentRecall": 1,
+    "readingOrderFailures": 0,
+    "tablesDetected": 0,
+    "tablesPresent": 2
+  }
+}

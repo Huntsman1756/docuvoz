@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-09-02T06:28:05.081Z",
+  "gate": "G4",
+  "pass": true,
+  "assertion": "No critical literal may vanish from a spoken segment without value-preserving coverage; no muted segment may carry legal meaning; no literal may be invented.",
+  "method": "Independent recomputation from persisted provenance (does not trust the runtime fidelity verdict).",
+  "fallbacksTotal": 0,
+  "note": "Fallbacks are safe (literal text spoken) but indicate missing rule coverage.",
+  "reports": [
+    {
+      "documentId": "ref-nested-regulation-01",
+      "tier": "reference",
+      "segments": 26,
+      "muted": 9,
+      "fallbacks": 0,
+      "preserved": {
+        "number": 5,
+        "numbers": 7,
+        "isin-verbatim": 1,
+        "legal-references": 9,
+        "exceptions": 2,
+        "percentages": 2,
+        "ordinals": 3,
+        "dates": 6,
+        "deadlines": 1,
+        "times": 2,
+        "monetary": 3,
+        "basis-points": 1,
+        "settlement": 2,
+        "conditions": 1,
+        "obligations": 1,
+        "permissions": 1
+      },
+      "violations": []
+    },
+    {
+      "documentId": "browser-nested-regulation-01",
+      "tier": "browser",
+      "segments": 23,
+      "muted": 6,
+      "fallbacks": 0,
+      "preserved": {
+        "number": 5,
+        "numbers": 7,
+        "isin-verbatim": 1,
+        "legal-references": 9,
+        "exceptions": 2,
+        "percentages": 2,
+        "ordinals": 3,
+        "dates": 6,
+        "deadlines": 1,
+        "times": 2,
+        "monetary": 3,
+        "basis-points": 1,
+        "settlement": 2,
+        "conditions": 1,
+        "obligations": 1,
+        "permissions": 1
+      },
+      "violations": []
+    },
+    {
+      "documentId": "ref-financial-report-01",
+      "tier": "reference",
+      "segments": 10,
+      "muted": 3,
+      "fallbacks": 0,
+      "preserved": {
+        "numbers": 2,
+        "percentages": 3,
+        "identifiers": 2,
+        "monetary": 3,
+        "obligations": 1,
+        "settlement": 1,
+        "ranges": 2
+      },
+      "violations": []
+    },
+    {
+      "documentId": "browser-financial-report-01",
+      "tier": "browser",
+      "segments": 9,
+      "muted": 2,
+      "fallbacks": 0,
+      "preserved": {
+        "numbers": 4,
+        "percentages": 3,
+        "identifiers": 2,
+        "monetary": 3,
+        "obligations": 1,
+        "settlement": 1
+      },
+      "violations": []
+    },
+    {
+      "documentId": "ref-extraction-artifacts-01",
+      "tier": "reference",
+      "segments": 11,
+      "muted": 6,
+      "fallbacks": 0,
+      "preserved": {
+        "permissions": 2,
+        "legal-references": 1,
+        "numbers": 1,
+        "number": 2
+      },
+      "violations": []
+    },
+    {
+      "documentId": "browser-extraction-artifacts-01",
+      "tier": "browser",
+      "segments": 9,
+      "muted": 4,
+      "fallbacks": 0,
+      "preserved": {
+        "exceptions": 1,
+        "permissions": 2,
+        "legal-references": 1,
+        "numbers": 1,
+        "number": 2
+      },
+      "violations": []
+    },
+    {
+      "documentId": "ref-simple-01",
+      "tier": "reference",
+      "segments": 6,
+      "muted": 2,
+      "fallbacks": 0,
+      "preserved": {
+        "numbers": 3
+      },
+      "violations": []
+    },
+    {
+      "documentId": "browser-simple-01",
+      "tier": "browser",
+      "segments": 6,
+      "muted": 2,
+      "fallbacks": 0,
+      "preserved": {
+        "numbers": 3
+      },
+      "violations": []
+    }
+  ]
+}

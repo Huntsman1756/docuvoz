@@ -1,0 +1,3 @@
+fixture,evaluator,date,mode_a,mode_b,preference,retained_pct_estimate,notes
+nested-regulation-01,CHANGE-ME,2026-09-02,listen,gold,A|B|tie,0-100,"Copy to g3b.csv. G3b: how much of the gold benefit does deterministic Listen retain? Cross-check with goldAgreement in spoken.json."
+nested-regulation-01,CHANGE-ME,2026-09-02,literal,listen,A|B|tie,0-100,"Baseline sanity: Listen should clearly beat literal if the hypothesis holds."

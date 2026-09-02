@@ -1,0 +1,2 @@
+fixture,evaluator,date,mode_a,mode_b,preference,listen_comprehension_a,listen_comprehension_b,notes
+nested-regulation-01,CHANGE-ME,2026-09-02,literal,gold,A|B|tie,1-5,1-5,"Copy to g3a.csv and fill honestly. G3a: if gold is not clearly better than literal -> STOP."
