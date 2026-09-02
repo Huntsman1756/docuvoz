@@ -1,6 +1,6 @@
 question_id,question,evaluator_answer,correct_y_n
-q1,What was the deadline (date and time) for submitting the information?,,
-q2,"Was the exemption for the entities in apartado 3 unconditional? If not, what reversed it?",,
-q3,Which article (and letter) of which law did the scope-of-application provision reference?,,
-q4,"Was the notification for amounts over 500,000 EUR optional or obligatory, and under what condition did it apply?",,
-q5,State the maximum threshold amount mentioned.,,
+q1,¿Cuál era el plazo (fecha y hora) para remitir la información?,,
+q2,"¿La exención de las entidades del apartado 3 era incondicional? Si no, ¿qué la revertía?",,
+q3,¿A qué artículo (y letra) de qué ley remitía la disposición de ámbito de aplicación?,,
+q4,"¿La notificación de importes superiores a 500.000 EUR era opcional u obligatoria, y bajo qué condición aplicaba?",,
+q5,Indique el importe máximo del umbral mencionado.,,

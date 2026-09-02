@@ -139,7 +139,7 @@ export interface ComprehensionQuestion {
 export const COMPREHENSION_QUESTIONS: readonly ComprehensionQuestion[] = [
   {
     id: "q1",
-    question: "What was the deadline (date and time) for submitting the information?",
+    question: "¿Cuál era el plazo (fecha y hora) para remitir la información?",
     acceptableAnswers: [
       "15 de julio de 2024 a las 14:00",
       "15/07/2024, 14:00",
@@ -150,7 +150,7 @@ export const COMPREHENSION_QUESTIONS: readonly ComprehensionQuestion[] = [
   {
     id: "q2",
     question:
-      "Was the exemption for the entities in apartado 3 unconditional? If not, what reversed it?",
+      "¿La exención de las entidades del apartado 3 era incondicional? Si no, ¿qué la revertía?",
     acceptableAnswers: [
       "no, salvo ratio de solvencia superior al 8,5 % durante dos ejercicios consecutivos",
       "not exempt if solvency ratio above 8.5% for two consecutive years",
@@ -160,7 +160,7 @@ export const COMPREHENSION_QUESTIONS: readonly ComprehensionQuestion[] = [
   {
     id: "q3",
     question:
-      "Which article (and letter) of which law did the scope-of-application provision reference?",
+      "¿A qué artículo (y letra) de qué ley remitía la disposición de ámbito de aplicación?",
     acceptableAnswers: [
       "artículo 57.1.b) / art. 57.1.b) de la Ley 47/2003",
       "article 57(1)(b) of Law 47/2003",
@@ -170,7 +170,7 @@ export const COMPREHENSION_QUESTIONS: readonly ComprehensionQuestion[] = [
   {
     id: "q4",
     question:
-      "Was the notification for amounts over 500,000 EUR optional or obligatory, and under what condition did it apply?",
+      "¿La notificación de importes superiores a 500.000 EUR era opcional u obligatoria, y bajo qué condición aplicaba?",
     acceptableAnswers: [
       "obligatoria (deberán), si el contrato se celebró después del 1 de enero de 2024",
       "obligatory, only for contracts concluded after 1 January 2024",
@@ -179,7 +179,7 @@ export const COMPREHENSION_QUESTIONS: readonly ComprehensionQuestion[] = [
   },
   {
     id: "q5",
-    question: "State the maximum threshold amount mentioned.",
+    question: "Indique el importe máximo del umbral mencionado.",
     acceptableAnswers: [
       "1.234.567,89 euros",
       "un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos",

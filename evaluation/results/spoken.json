@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T08:36:58.840Z",
+  "generatedAt": "2026-09-02T09:08:06.147Z",
   "gate": "G3B_AUTOMATION_PROXY (engineering regression only — never an experience proxy)",
   "question": "How much of the Manual Gold improvement does the deterministic engine capture? (lexical agreement only; human A/B still required)",
   "fixtures": [
@@ -57,8 +57,8 @@
         "total": 21
       },
       "goldAgreement": {
-        "entries": 5,
-        "meanSimilarity": 0.951,
+        "entries": 8,
+        "meanSimilarity": 0.945,
         "exactMatches": 1,
         "details": [
           {
@@ -90,6 +90,24 @@
             "similarity": 0.886,
             "listen": "segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de T más dos días hábiles, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro.",
             "gold": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+          },
+          {
+            "blockId": "b14",
+            "similarity": 0.865,
+            "listen": "b) El tipo aplicable será el resultado de incrementar el EURIBOR a doce meses en veinticinco puntos básicos.",
+            "gold": "Letra be. El tipo aplicable será el resultado de incrementar el euríbor a doce meses en veinticinco puntos básicos."
+          },
+          {
+            "blockId": "b22",
+            "similarity": 0.966,
+            "listen": "El modelo de informe deberá presentarse conforme al Anexo I, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio dos mil veintitrés.",
+            "gold": "El modelo de informe deberá presentarse conforme al Anexo uno, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio dos mil veintitrés."
+          },
+          {
+            "blockId": "b23",
+            "similarity": 0.974,
+            "listen": "(uno) Los porcentajes se calcularán sobre el balance auditado a treinta y uno de diciembre de dos mil veintitrés.",
+            "gold": "Nota uno. Los porcentajes se calcularán sobre el balance auditado a treinta y uno de diciembre de dos mil veintitrés."
           }
         ]
       }
@@ -210,7 +228,7 @@
     }
   ],
   "summary": {
-    "meanGoldAgreement": 0.951,
+    "meanGoldAgreement": 0.945,
     "totalRejected": 0
   }
 }

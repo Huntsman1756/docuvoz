@@ -10,16 +10,20 @@
  *   answer-sheet.csv   blinded ratings + preference per pair (committed)
  *   questions.csv      objective comprehension items (committed)
  *   private/key.json   condition mapping + answer key (gitignored)
- *   audio/             generated clips (gitignored; deterministic to rebuild)
+ *   audio/             generated clips — COMMITTED for G3a (the exact stimuli
+ *                      listeners heard must be reproducible byte-for-byte;
+ *                      regeneration is not guaranteed to be identical)
  *
  * Audio refuses to come from the mock provider: a tone is not a listening
  * stimulus. Dry-run produces everything except audio so pairing, blinding
  * and balance can be reviewed offline; the experiment itself still requires
  * real audio + human ears (G3A stays OPEN until the sheet is filled).
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createProvider, loadConfig } from "../../src/server/config";
+import { SPOKEN_ENGINE_VERSION } from "../../src/domain/spoken/version";
 import type { SpeechRequest } from "../../src/domain/speech/types";
 import { ROOT, loadGold, loadManifest, loadReference, readWavDurationMs } from "./shared";
 import {
@@ -94,6 +98,8 @@ async function main(): Promise<void> {
     text: string;
     file: string | null;
     audioMs: number | null;
+    sha256: string | null;
+    bytes: number | null;
   }
   const clips: ClipRow[] = [];
   for (const a of assignments) {
@@ -115,6 +121,8 @@ async function main(): Promise<void> {
     ] as const) {
       let file: string | null = null;
       let audioMs: number | null = null;
+      let sha256: string | null = null;
+      let bytes: number | null = null;
       if (provider) {
         file = `${clipId}.${ext}`;
         const settings: SpeechRequest["settings"] = {
@@ -127,6 +135,8 @@ async function main(): Promise<void> {
         const result = await provider.synthesize({ text, settings });
         writeFileSync(join(audioDir, file), result.audio);
         audioMs = readWavDurationMs(result.audio);
+        sha256 = createHash("sha256").update(result.audio).digest("hex");
+        bytes = result.audio.byteLength;
         console.log(`  ${clipId} (${condition}) → ${file} ${audioMs ?? "?"}ms`);
       }
       clips.push({
@@ -138,6 +148,8 @@ async function main(): Promise<void> {
         text,
         file,
         audioMs,
+        sha256,
+        bytes,
       });
     }
   }
@@ -174,9 +186,9 @@ async function main(): Promise<void> {
     console.log(
       `[g3a:prepare] ${pairs.length} pairs, ${clips.length} clips, ` +
         `≈${(audioSeconds / 60).toFixed(1)} min per condition` +
-        (audioSeconds / 60 < 8
-          ? " — BELOW the 8–12 min target; extend the gold file by hand and rerun"
-          : ""),
+        (audioSeconds < 90 || audioSeconds > 120
+          ? " — OUTSIDE the pre-registered 90–120 s/condition target (see PROTOCOL.md)"
+          : " — within the pre-registered 90–120 s/condition target"),
     );
   } else {
     console.log(
@@ -185,6 +197,14 @@ async function main(): Promise<void> {
   }
 
   const targetTotalSeconds = clips.reduce((s, c) => s + (c.audioMs ?? 0), 0) / 1000;
+  const fileSha = (path: string): string =>
+    createHash("sha256").update(readFileSync(path)).digest("hex");
+  const revisions = {
+    corpusManifest: fileSha(join(ROOT, "public", "corpus", "manifest.json")),
+    reference: fileSha(join(ROOT, "public", "corpus", "reference", `${FIXTURE}.json`)),
+    gold: fileSha(join(ROOT, "public", "corpus", "gold", `${FIXTURE}.json`)),
+    spokenEngineVersion: SPOKEN_ENGINE_VERSION,
+  };
 
   writeFileSync(
     join(OUT_DIR, "manifest.json"),
@@ -197,6 +217,15 @@ async function main(): Promise<void> {
         status: provider
           ? "AUDIO GENERATED — awaiting human sessions"
           : "DRY-RUN — audio not generated (G3A remains OPEN)",
+        generation: {
+          provider: config.SPEECH_PROVIDER,
+          model: config.NAN_TTS_MODEL,
+          voice: config.NAN_TTS_VOICE,
+          format: ext,
+          speed: config.SPEECH_DEFAULT_SPEED,
+          spokenEngineVersion: SPOKEN_ENGINE_VERSION,
+          revisions,
+        },
         audioFormat: provider ? ext : null,
         audioSecondsPerCondition: provider ? Math.round(targetTotalSeconds / 2) : null,
         ratingScale:
@@ -206,6 +235,8 @@ async function main(): Promise<void> {
           clipId: c.clipId,
           file: c.file,
           audioMs: c.audioMs,
+          sha256: c.sha256,
+          bytes: c.bytes,
           // The condition is deliberately NOT in the blinded manifest when
           // clips exist... but texts are public (synthetic fixture), so the
           // manifest documents pairing structure; blinding is operational:

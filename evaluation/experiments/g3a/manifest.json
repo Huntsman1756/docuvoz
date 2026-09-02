@@ -2,118 +2,227 @@
   "experiment": "G3a — Literal vs Manual Gold (blind paired comparison)",
   "fixture": "nested-regulation-01",
   "seed": 20260902,
-  "generatedAt": "2026-09-02T07:33:05.816Z",
-  "status": "DRY-RUN — audio not generated (G3A remains OPEN)",
-  "audioFormat": null,
-  "audioSecondsPerCondition": null,
+  "generatedAt": "2026-09-02T09:35:54.981Z",
+  "status": "AUDIO GENERATED — awaiting human sessions",
+  "generation": {
+    "provider": "nan",
+    "model": "kokoro",
+    "voice": "ef_dora",
+    "format": "wav",
+    "speed": 1,
+    "spokenEngineVersion": "1.1.0",
+    "revisions": {
+      "corpusManifest": "3c718d5911220be2a6b20d585b2a0f56cfa42de13481e7f32e2e221382cfb0e4",
+      "reference": "9fe5091679e88a7a6f68addd942b007cf51539d41c045e090089575852220ab4",
+      "gold": "9497e0268313f54666d4037500bca048190fbbe0d3d3aa8892f7d203523163af",
+      "spokenEngineVersion": "1.1.0"
+    }
+  },
+  "audioFormat": "wav",
+  "audioSecondsPerCondition": 85,
   "ratingScale": "comprehension/followability/confidence: 1 worst..5 best; fatigue: 1 least fatiguing..5 most fatiguing",
   "balanceReport": [
     {
-      "pair": 4,
-      "charRatio": 1.38,
-      "durationRatio": null
+      "pair": 6,
+      "charRatio": 1.1,
+      "durationRatio": 1.02
     },
     {
       "pair": 0,
       "charRatio": 1.54,
-      "durationRatio": null
-    },
-    {
-      "pair": 3,
-      "charRatio": 2.94,
-      "durationRatio": null
-    },
-    {
-      "pair": 2,
-      "charRatio": 1.37,
-      "durationRatio": null
+      "durationRatio": 1.12
     },
     {
       "pair": 1,
       "charRatio": 1.15,
-      "durationRatio": null
+      "durationRatio": 1.03
+    },
+    {
+      "pair": 5,
+      "charRatio": 1.35,
+      "durationRatio": 1.14
+    },
+    {
+      "pair": 7,
+      "charRatio": 1.6,
+      "durationRatio": 1.2
+    },
+    {
+      "pair": 4,
+      "charRatio": 1.38,
+      "durationRatio": 1.1
+    },
+    {
+      "pair": 3,
+      "charRatio": 2.94,
+      "durationRatio": 1.32
+    },
+    {
+      "pair": 2,
+      "charRatio": 1.37,
+      "durationRatio": 1.07
     }
   ],
   "stimuli": [
     {
       "clipId": "g3a-sga9et29",
-      "file": null,
-      "audioMs": null,
-      "pair": 4,
+      "file": "g3a-sga9et29.wav",
+      "audioMs": 10191,
+      "sha256": "1e47885fc2b5d8292832e7f1d6e332d28f18dccf7dbd75b7af13e956cb7fa2f8",
+      "bytes": 489228,
+      "pair": 6,
       "side": "left",
-      "text": "2.º Los importes superiores a 500.000 EUR deberán notificarse, además, en un plazo de T+2 días hábiles, siempre que el contrato se haya celebrado con posterioridad al 1 de enero de 2024."
+      "text": "El modelo de informe deberá presentarse conforme al Anexo I, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio 2023."
     },
     {
       "clipId": "g3a-7gjertnj",
-      "file": null,
-      "audioMs": null,
-      "pair": 4,
+      "file": "g3a-7gjertnj.wav",
+      "audioMs": 10441,
+      "sha256": "b402c79701925b875dfd625f47d6e836f513e9b41c2b531b928c02635d7ecddc",
+      "bytes": 501228,
+      "pair": 6,
       "side": "right",
-      "text": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+      "text": "El modelo de informe deberá presentarse conforme al Anexo uno, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio dos mil veintitrés."
     },
     {
       "clipId": "g3a-7w8sfcvx",
-      "file": null,
-      "audioMs": null,
+      "file": "g3a-7w8sfcvx.wav",
+      "audioMs": 21178,
+      "sha256": "1fb0320fbf8130e8fdab96e6dc6e93ca1e1773d50fdf6bc8838542b0ddc19287",
+      "bytes": 1016636,
       "pair": 0,
       "side": "left",
       "text": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra b, de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el Boletín Oficial del Estado número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres."
     },
     {
       "clipId": "g3a-mh8338rv",
-      "file": null,
-      "audioMs": null,
+      "file": "g3a-mh8338rv.wav",
+      "audioMs": 18831,
+      "sha256": "2da7ef37ab896e822a421ab4d17323c297e59fa5adf965fb43328f473fb0f27c",
+      "bytes": 903986,
       "pair": 0,
       "side": "right",
       "text": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el art. 57.1.b) de la Ley 47/2003, de 26 de noviembre, publicada en el BOE núm. 288, de 2 de diciembre de 2003, sin perjuicio de lo dispuesto en el apartado 3."
     },
     {
       "clipId": "g3a-84vxcned",
-      "file": null,
-      "audioMs": null,
-      "pair": 3,
-      "side": "left",
-      "text": "Letra a. El umbral máximo será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos."
-    },
-    {
-      "clipId": "g3a-9fgqyfm7",
-      "file": null,
-      "audioMs": null,
-      "pair": 3,
-      "side": "right",
-      "text": "a) El umbral máximo será de 1.234.567,89 euros."
-    },
-    {
-      "clipId": "g3a-33ffjjdj",
-      "file": null,
-      "audioMs": null,
-      "pair": 2,
-      "side": "left",
-      "text": "1.º Las entidades deberán remitir la información antes del día 15/07/2024 y, a más tardar, a las 14:00, hora peninsular."
-    },
-    {
-      "clipId": "g3a-8gnjjcmd",
-      "file": null,
-      "audioMs": null,
-      "pair": 2,
-      "side": "right",
-      "text": "Punto primero. Las entidades deberán remitir la información antes del quince de julio de dos mil veinticuatro y, a más tardar, a las catorce horas, hora peninsular."
-    },
-    {
-      "clipId": "g3a-nz3xrwhv",
-      "file": null,
-      "audioMs": null,
+      "file": "g3a-84vxcned.wav",
+      "audioMs": 10791,
+      "sha256": "d71c71abc8c382bc14bbd46672adf603ec1e18c624bccaee2659ae68fe9251cc",
+      "bytes": 518040,
       "pair": 1,
       "side": "left",
       "text": "No obstante, quedarán exentas las entidades a que se refiere el apartado tres, salvo que superen un ratio de solvencia del ocho coma cinco por ciento durante dos ejercicios consecutivos."
     },
     {
-      "clipId": "g3a-dwhcfpfy",
-      "file": null,
-      "audioMs": null,
+      "clipId": "g3a-9fgqyfm7",
+      "file": "g3a-9fgqyfm7.wav",
+      "audioMs": 10466,
+      "sha256": "d51e6cf61daa007e361d3cbeaa77f1f40f9fefbc65fdb0af03943e5b0f634b04",
+      "bytes": 502440,
       "pair": 1,
       "side": "right",
       "text": "No obstante, quedarán exentas las entidades a que se refiere el apartado 3, salvo que superen un ratio de solvencia del 8,5 % durante dos ejercicios consecutivos."
+    },
+    {
+      "clipId": "g3a-33ffjjdj",
+      "file": "g3a-33ffjjdj.wav",
+      "audioMs": 6040,
+      "sha256": "48339f2f91d66f9dac0fcdcb1950eed82c027bfb7e12e39d8fc9ed13af6a7bda",
+      "bytes": 290010,
+      "pair": 5,
+      "side": "left",
+      "text": "b) El tipo aplicable será el resultado de incrementar el EURIBOR a 12 meses en 25 pb."
+    },
+    {
+      "clipId": "g3a-8gnjjcmd",
+      "file": "g3a-8gnjjcmd.wav",
+      "audioMs": 6891,
+      "sha256": "fdd6099875dae60c14082deb304128d21e72c3e04ed86a01a40d591295da5e84",
+      "bytes": 330830,
+      "pair": 5,
+      "side": "right",
+      "text": "Letra be. El tipo aplicable será el resultado de incrementar el euríbor a doce meses en veinticinco puntos básicos."
+    },
+    {
+      "clipId": "g3a-nz3xrwhv",
+      "file": "g3a-nz3xrwhv.wav",
+      "audioMs": 6966,
+      "sha256": "8ad1d27b61846f024469d60e96cb7f95adab66558fb3eb6b9657602d4f4b8c8a",
+      "bytes": 334440,
+      "pair": 7,
+      "side": "left",
+      "text": "Nota uno. Los porcentajes se calcularán sobre el balance auditado a treinta y uno de diciembre de dos mil veintitrés."
+    },
+    {
+      "clipId": "g3a-dwhcfpfy",
+      "file": "g3a-dwhcfpfy.wav",
+      "audioMs": 5791,
+      "sha256": "e6bb3419abeb207203b1c13525219098e3e9ab368173177bc8437ed567eaf3b8",
+      "bytes": 278036,
+      "pair": 7,
+      "side": "right",
+      "text": "(1) Los porcentajes se calcularán sobre el balance auditado a 31-12-2023."
+    },
+    {
+      "clipId": "g3a-egcpkd7g",
+      "file": "g3a-egcpkd7g.wav",
+      "audioMs": 14903,
+      "sha256": "4014cf010b1715fc05ed715149d7092b5d2785e3a8927b07df3b7018493c5ce6",
+      "bytes": 715398,
+      "pair": 4,
+      "side": "left",
+      "text": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+    },
+    {
+      "clipId": "g3a-2jdxsrg2",
+      "file": "g3a-2jdxsrg2.wav",
+      "audioMs": 13590,
+      "sha256": "25e7512fbdd451879560ce14fedf22872b653b84b3e8815567dd0d9f9d54f918",
+      "bytes": 652410,
+      "pair": 4,
+      "side": "right",
+      "text": "2.º Los importes superiores a 500.000 EUR deberán notificarse, además, en un plazo de T+2 días hábiles, siempre que el contrato se haya celebrado con posterioridad al 1 de enero de 2024."
+    },
+    {
+      "clipId": "g3a-9228c95c",
+      "file": "g3a-9228c95c.wav",
+      "audioMs": 7891,
+      "sha256": "1f1d46cdaa6aea5fb073ab8039cd01204b3b636c5d02351eb59fa64408d993d5",
+      "bytes": 378830,
+      "pair": 3,
+      "side": "left",
+      "text": "Letra a. El umbral máximo será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos."
+    },
+    {
+      "clipId": "g3a-9936z3h4",
+      "file": "g3a-9936z3h4.wav",
+      "audioMs": 5991,
+      "sha256": "ee4ecf010346727c1fc888c396707c00e2594a16a876261493ad0eb075cb0355",
+      "bytes": 287640,
+      "pair": 3,
+      "side": "right",
+      "text": "a) El umbral máximo será de 1.234.567,89 euros."
+    },
+    {
+      "clipId": "g3a-gxtr9hrb",
+      "file": "g3a-gxtr9hrb.wav",
+      "audioMs": 9684,
+      "sha256": "22d9f4142b7892063b9ac06117497fdb31c8d7699c5261293f6d3062e34b1877",
+      "bytes": 464904,
+      "pair": 2,
+      "side": "left",
+      "text": "Punto primero. Las entidades deberán remitir la información antes del quince de julio de dos mil veinticuatro y, a más tardar, a las catorce horas, hora peninsular."
+    },
+    {
+      "clipId": "g3a-zm553m8m",
+      "file": "g3a-zm553m8m.wav",
+      "audioMs": 10391,
+      "sha256": "09b9358cd88bb067037b4ebe40d80b7913a71826b56291065840928dae5f8c0e",
+      "bytes": 498828,
+      "pair": 2,
+      "side": "right",
+      "text": "1.º Las entidades deberán remitir la información antes del día 15/07/2024 y, a más tardar, a las 14:00, hora peninsular."
     }
   ]
 }

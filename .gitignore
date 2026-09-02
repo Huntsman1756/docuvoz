@@ -59,4 +59,8 @@ evaluation/corpus/local/
 # (blinding requires private/ never being published)
 evaluation/experiments/*/audio/
 evaluation/experiments/*/private/
+# G3a WAV stimuli are intentionally NOT committed: redistribution rights for
+# NaN-generated audio are unconfirmed (provider ToS silent on outputs).
+# Stimulus identity is pinned by the SHA-256 values in
+# evaluation/experiments/g3a/manifest.json; binaries live in the private kit.
 

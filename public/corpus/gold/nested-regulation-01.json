@@ -1,6 +1,6 @@
 {
   "fixtureId": "nested-regulation-01",
-  "notice": "Manual Gold is a human-authored spoken upper bound for experiments (gate G3a). It is never produced by the automatic engine.",
+  "notice": "Manual Gold is a human-authored spoken upper bound for experiments (gate G3a). It is never produced by the automatic engine. b14/b22/b23 authored by the human reviewer (2026-09-02), transcribed verbatim.",
   "entries": [
     {
       "blockId": "b5",
@@ -21,6 +21,18 @@
     {
       "blockId": "b15",
       "spokenText": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+    },
+    {
+      "blockId": "b14",
+      "spokenText": "Letra be. El tipo aplicable será el resultado de incrementar el euríbor a doce meses en veinticinco puntos básicos."
+    },
+    {
+      "blockId": "b22",
+      "spokenText": "El modelo de informe deberá presentarse conforme al Anexo uno, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio dos mil veintitrés."
+    },
+    {
+      "blockId": "b23",
+      "spokenText": "Nota uno. Los porcentajes se calcularán sobre el balance auditado a treinta y uno de diciembre de dos mil veintitrés."
     }
   ]
 }

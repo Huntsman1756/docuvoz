@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T08:36:59.910Z",
+  "generatedAt": "2026-09-02T09:08:07.391Z",
   "gate": "G4A_CRITICAL_LITERAL_PRESERVATION (semantic fidelity is G4b, human-reviewed)",
   "pass": true,
   "assertion": "No critical literal may vanish from a spoken segment without value-preserving coverage; no muted segment may carry legal meaning; no literal may be invented.",
