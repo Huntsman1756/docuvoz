@@ -27,7 +27,10 @@
     "eval:extraction": "tsx evaluation/scripts/run-extraction-eval.ts",
     "eval:spoken": "tsx evaluation/scripts/run-spoken-eval.ts",
     "eval:fidelity": "tsx evaluation/scripts/run-fidelity-eval.ts",
-    "eval:tts:live": "tsx evaluation/scripts/run-tts-latency.ts"
+    "eval:tts:live": "tsx evaluation/scripts/run-tts-latency.ts",
+    "eval:tts:wiring": "tsx evaluation/scripts/run-tts-latency.ts --wiring",
+    "g3a:prepare": "tsx evaluation/scripts/prepare-g3a.ts",
+    "g4b:packet": "tsx evaluation/scripts/g4b-packet.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",

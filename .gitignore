@@ -55,3 +55,8 @@ next-env.d.ts
 # locally-held real-world corpus documents (never committed)
 evaluation/corpus/local/
 
+# experiment working data: audio + answer keys are regenerable or private
+# (blinding requires private/ never being published)
+evaluation/experiments/*/audio/
+evaluation/experiments/*/private/
+
