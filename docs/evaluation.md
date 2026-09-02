@@ -5,28 +5,36 @@ Machine-readable experiment outputs live in `evaluation/results/`
 `evaluation/scripts/` and run under `tsx` with no network dependency unless
 explicitly stated.
 
-| Command                   | Gate          | Output                    | Measures                                                                                                                                                                                            |
-| ------------------------- | ------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run eval:extraction` | G2            | `results/extraction.json` | browser (pdf.js) extraction vs reference exports: block recovery, headings, lists, footnotes, chrome classification, page/reading-order accuracy, provenance coverage.                              |
-| `npm run eval:spoken`     | G3b (partial) | `results/spoken.json`     | per fixture: transformation counts, fallbacks/rejections, rule coverage, unchanged ratio, and Listen-vs-Manual-Gold agreement where a gold file exists.                                             |
-| `npm run eval:fidelity`   | G4            | `results/fidelity.json`   | critical literals (numbers, dates, amounts, identifiers, legal terms) preserved or safely fallen back; list of violations (must be empty).                                                          |
-| `npm run eval:tts:live`   | G1            | `results/tts.json`        | **requires `SPEECH_PROVIDER=nan` + credentials.** Real request latency p50/p95, generated audio seconds, cache hit ratio, errors. Refuses to run on mock so mock numbers can masquerade as reality. |
+| Command                   | Role                                          | Output                          | Measures                                                                                                                                                                                       |
+| ------------------------- | --------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run eval:extraction` | synthetic **smoke test** (never closes G2)    | `results/extraction.json`       | browser (pdf.js) extraction vs reference exports: block recovery, headings, lists, footnotes, chrome classification, page/reading-order, provenance coverage.                                  |
+| `npm run eval:spoken`     | engine telemetry + **engineering regression** | `results/spoken.json`           | per fixture: transformation counts, fallbacks/rejections, rule coverage, unchanged ratio; Listen-vs-Gold word-level Dice as a rule-regression alarm only.                                      |
+| `npm run eval:fidelity`   | **G4a**                                       | `results/fidelity.json`         | critical literals preserved or safely fallen back; violations list (must be empty). Literal preservation only — not semantic fidelity (G4b).                                                   |
+| `npm run eval:tts:live`   | **G1**                                        | `results/tts.json`              | **requires `SPEECH_PROVIDER=nan` + credentials.** Per-sample TTFA, wire latency, retries, pacing queue wait, audio duration, RTF, bytes, statuses; sustained `--burn` 429 count. Refuses mock. |
+| `npm run eval:tts:wiring` | G1 harness self-test (never G1 evidence)      | `results/tts.wiring-smoke.json` | same pipeline driven by the mock provider; output deliberately written to a separate file.                                                                                                     |
+| `npm run g3a:prepare`     | builds **G3a** blind-listening kit            | `experiments/g3a/`              | paired Literal/Gold clips, randomized blinded labels, answer sheet, comprehension questions, duration balance report.                                                                          |
+| `npm run g4b:packet`      | builds **G4b** human review packet            | `experiments/g4b/`              | deterministic source→spoken rows per construction class for manual semantic verdicts. No LLM judge.                                                                                            |
 
-Human gates (not automatable honestly):
+Human gates (G3a, G3b-human, G4b, G2-real) are not automatable; their
+instruments and rules live in `evaluation/README.md` and
+`evaluation/experiments/`.
 
-- **G3a** — listen Literal vs Manual Gold on `nested-regulation-01` (the
-  corpus fixture ships a gold file) and record your verdict in
-  `evaluation/results/g3a.csv` (template: `g3a.example.csv`). If Gold is not
-  clearly better: STOP (see `docs/phase-0.md`).
-- **G3b** — listen Literal vs Listen vs Gold; record in
-  `evaluation/results/g3b.csv` (template provided). Compare with the
-  automatic `goldAgreement` score: the rules engine should capture a
-  meaningful portion of the human-authored improvement.
+## G1 rate-limit evidence
+
+`eval:tts:live --burn N` runs N requests through the **real pacing layer**
+and reports how many 429s occur at the configured
+`SPEECH_REQUESTS_PER_MINUTE`. Evidence for
+`G1_PROVIDER_RATE_BEHAVIOR = PASS` is: burn with zero 429s while provider
+errors would be reachable (i.e. requests > plan limit × minutes elapsed). To
+observe provider behavior _at_ the limit, raise
+`SPEECH_REQUESTS_PER_MINUTE` above the provider's published cap for one
+controlled burn and record the resulting 429 pattern — this consumes quota
+and must be a deliberate, documented choice.
 
 ## Reading `fidelity.json`
 
-- `violations[]` must be empty for G4. A violation is a critical literal that
-  vanished from a _spoken_ segment without value-preserving coverage.
+- `violations[]` must be empty for G4a. A violation is a critical literal
+  that vanished from a _spoken_ segment without value-preserving coverage.
 - `fallbacks` counts segments where the engine rejected its own output and
   fell back to literal. Fallbacks are **safe** but they are also _evidence
   the engine failed to normalize_ — a high rate means coverage is missing.
@@ -36,7 +44,9 @@ Human gates (not automatable honestly):
 Compared against the reference export, the browser extractor reports recall
 (what structure survived) and misclassifications (what it got wrong).
 Deliberate known gaps: tables are never detected; two-column documents are
-read geometrically.
+read geometrically. High word-level recall with wrong reading order is the
+failure mode G2-real exists to catch; synthetic numbers must not be quoted
+as a passed gate.
 
 ## Corpus
 

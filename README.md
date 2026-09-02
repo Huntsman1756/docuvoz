@@ -83,36 +83,43 @@ NAN_API_KEY=<server-only; never reaches the browser>
 
 ## Commands
 
-| Command                                       | What it does                                                         |
-| --------------------------------------------- | -------------------------------------------------------------------- |
-| `npm test`                                    | unit + golden + integration (mock provider, offline)                 |
-| `npm run lint` / `typecheck` / `format:check` | static checks                                                        |
-| `npm run build`                               | production build                                                     |
-| `npm run test:e2e`                            | Playwright critical-path tests (CI-safe, mock provider)              |
-| `npm run fixtures`                            | regenerate the synthetic corpus (PDFs + reference JSON + gold)       |
-| `npm run eval:extraction`                     | G2: browser extraction vs reference structure                        |
-| `npm run eval:spoken`                         | engine activity + Listen-vs-Gold agreement (G3b proxy)               |
-| `npm run eval:fidelity`                       | G4: critical-literal preservation; **fails the build on violations** |
-| `npm run eval:tts:live`                       | G1: real provider latency (requires credentials, refuses mock)       |
-| `npm run test:provider:live`                  | opt-in live NaN wiring check (local only)                            |
+| Command                                       | What it does                                                          |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| `npm test`                                    | unit + golden + integration (mock provider, offline)                  |
+| `npm run lint` / `typecheck` / `format:check` | static checks                                                         |
+| `npm run build`                               | production build                                                      |
+| `npm run test:e2e`                            | Playwright critical-path tests (CI-safe, mock provider)               |
+| `npm run fixtures`                            | regenerate the synthetic corpus (PDFs + reference JSON + gold)        |
+| `npm run eval:extraction`                     | synthetic smoke test for extraction (does **not** close G2)           |
+| `npm run eval:spoken`                         | engine activity + Listen-vs-Gold engineering regression metric        |
+| `npm run eval:fidelity`                       | G4a: critical-literal preservation; **fails the build on violations** |
+| `npm run eval:tts:live`                       | G1: real provider measurement (requires credentials, refuses mock)    |
+| `npm run eval:tts:wiring`                     | offline wiring smoke for the G1 harness (never G1 evidence)           |
+| `npm run g3a:prepare`                         | build the G3a blind listening kit (audio needs real credentials)      |
+| `npm run g4b:packet`                          | build the G4b human semantic-fidelity review packet                   |
+| `npm run test:provider:live`                  | opt-in live NaN wiring check (local only)                             |
 
-## Phase 0 gates
+## Phase 0 status
 
-Defined in [docs/phase-0.md](docs/phase-0.md) with explicit GO/NO-GO
-criteria. Current state:
+Two different claims, never conflated: **the laboratory is built** and
+**the hypothesis is validated**. Only the first is true today. Canonical
+table in [docs/phase-0.md](docs/phase-0.md):
 
-- **G4 Fidelity** — ✅ passing (0 violations / 0 silent losses on corpus;
-  `evaluation/results/fidelity.json`).
-- **G2 Extraction** — ✅ measured (native PDFs: ~100% content recall,
-  headings recovered; tables/two-column are documented gaps —
-  `evaluation/results/extraction.json`).
-- **G3b proxy** — automatic agreement between Listen and Manual Gold on
-  `nested-regulation-01`: **0.95** word-level Dice
-  (`evaluation/results/spoken.json`); human A/B still pending.
-- **G3a / G3b human** — ⏳ needs the listening protocol
-  (`evaluation/results/g3*.example.csv`).
-- **G1 TTS latency** — ⏳ open: no NaN credentials existed in this
-  environment; adapter wiring is mock-tested only.
+```text
+PHASE_0_INFRASTRUCTURE        = PASS   builds/tests/gates runnable offline
+G1_TTS_LIVE                   = OPEN   no provider credentials in this environment
+G2_EXTRACTION_REAL            = OPEN   synthetic smoke only (tables 0/2, footnote 0/1)
+G3A_PRODUCT_HYPOTHESIS        = OPEN   blind protocol prepared, ears required
+G3B_AUTOMATION_PROXY          = PASS   word-level Dice 0.95 — engineering regression ONLY
+G3B_HUMAN                     = OPEN   capture-ratio protocol prepared (Literal/Gold/Listen)
+G4A_CRITICAL_LITERAL_PRESERV. = PASS   0 violations, 0 silent losses (machine-verified)
+G4B_SEMANTIC_FIDELITY         = OPEN   human review packet prepared, not yet reviewed
+PRODUCT_GO_NO_GO              = NOT_DECIDED
+```
+
+A green CI run proves the experiment machinery works. It is not evidence
+that documents are easier to understand when heard — that is what G3a/G3b
+humans exist to decide.
 
 ## Architecture (tour)
 

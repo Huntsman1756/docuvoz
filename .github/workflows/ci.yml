@@ -35,7 +35,7 @@ jobs:
         run: npm run typecheck
       - name: Unit, golden and integration tests (no network)
         run: npm test
-      - name: Evaluation harness (offline gates G2/G4)
+      - name: Evaluation harness (G4a + synthetic smoke + regression metric)
         run: |
           npm run eval:extraction
           npm run eval:spoken

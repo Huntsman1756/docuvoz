@@ -8,6 +8,41 @@ The **spoken-representation engine** has its own version
 (`SPOKEN_ENGINE_VERSION`) that is part of every audio cache key; engine rule
 changes are listed under the same headings.
 
+## [Unreleased]
+
+### Changed
+
+- **Gate vocabulary split (binding):** infrastructure status is now separate
+  from validation status. `PHASE_0_INFRASTRUCTURE = PASS` no longer reads as
+  Phase 0 completion; the decision state is `PRODUCT_GO_NO_GO = NOT_DECIDED`
+  until every gate has real evidence (`docs/phase-0.md`).
+- `G4` renamed to `G4A_CRITICAL_LITERAL_PRESERVATION`;
+  `G4B_SEMANTIC_FIDELITY` introduced as a separate, human, no-LLM-judge
+  gate.
+- Listen-vs-Gold word-level Dice repositioned as `G3B_AUTOMATION_PROXY` — an
+  engineering regression metric, explicitly not an experience proxy;
+  `G3B_HUMAN` defined via the capture-ratio protocol.
+- `eval:extraction` output labeled `G2-SMOKE`; the real gate is
+  `G2_EXTRACTION_REAL = OPEN` until the five-document benchmark runs.
+- `eval:tts:live` rewritten to measure per-request TTFA, wire latency,
+  retries, pacing queue wait, audio duration, RTF and wire-level 429s over a
+  stratified sample of real Listen chunks, with a sustained `--burn` mode;
+  it maps only to the transport sub-gates `G1_PROVIDER_CONNECTIVITY`,
+  `G1_PROVIDER_LATENCY`, `G1_PROVIDER_RATE_BEHAVIOR`.
+
+### Added
+
+- `npm run eval:tts:wiring` — offline self-test of the measurement harness
+  writing to `results/tts.wiring-smoke.json`, clearly excluded from G1.
+- `npm run g3a:prepare` — G3a blind listening kit: Literal-vs-Manual-Gold
+  pairs from `nested-regulation-01` with seeded randomized blinded labels,
+  answer sheet, objective comprehension questions and duration-balance
+  report (`evaluation/experiments/g3a/PROTOCOL.md`). Condition key and audio
+  are gitignored; mock audio is refused by design.
+- `npm run g4b:packet` — deterministic source→spoken human review packet
+  (`evaluation/experiments/g4b/`).
+- Unit tests for the G3a pairing/blinding logic (`tests/unit/g3a-lib.test.ts`).
+
 ## [0.1.0] - 2026-09-02
 
 First Phase 0 laboratory release.
