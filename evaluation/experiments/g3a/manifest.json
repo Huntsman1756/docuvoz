@@ -1,0 +1,119 @@
+{
+  "experiment": "G3a — Literal vs Manual Gold (blind paired comparison)",
+  "fixture": "nested-regulation-01",
+  "seed": 20260902,
+  "generatedAt": "2026-09-02T07:33:05.816Z",
+  "status": "DRY-RUN — audio not generated (G3A remains OPEN)",
+  "audioFormat": null,
+  "audioSecondsPerCondition": null,
+  "ratingScale": "comprehension/followability/confidence: 1 worst..5 best; fatigue: 1 least fatiguing..5 most fatiguing",
+  "balanceReport": [
+    {
+      "pair": 4,
+      "charRatio": 1.38,
+      "durationRatio": null
+    },
+    {
+      "pair": 0,
+      "charRatio": 1.54,
+      "durationRatio": null
+    },
+    {
+      "pair": 3,
+      "charRatio": 2.94,
+      "durationRatio": null
+    },
+    {
+      "pair": 2,
+      "charRatio": 1.37,
+      "durationRatio": null
+    },
+    {
+      "pair": 1,
+      "charRatio": 1.15,
+      "durationRatio": null
+    }
+  ],
+  "stimuli": [
+    {
+      "clipId": "g3a-sga9et29",
+      "file": null,
+      "audioMs": null,
+      "pair": 4,
+      "side": "left",
+      "text": "2.º Los importes superiores a 500.000 EUR deberán notificarse, además, en un plazo de T+2 días hábiles, siempre que el contrato se haya celebrado con posterioridad al 1 de enero de 2024."
+    },
+    {
+      "clipId": "g3a-7gjertnj",
+      "file": null,
+      "audioMs": null,
+      "pair": 4,
+      "side": "right",
+      "text": "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro."
+    },
+    {
+      "clipId": "g3a-7w8sfcvx",
+      "file": null,
+      "audioMs": null,
+      "pair": 0,
+      "side": "left",
+      "text": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el artículo cincuenta y siete, apartado uno, letra b, de la Ley cuarenta y siete, dos mil tres, de veintiséis de noviembre, publicada en el Boletín Oficial del Estado número doscientos ochenta y ocho, de dos de diciembre de dos mil tres, sin perjuicio de lo dispuesto en el apartado tres."
+    },
+    {
+      "clipId": "g3a-mh8338rv",
+      "file": null,
+      "audioMs": null,
+      "pair": 0,
+      "side": "right",
+      "text": "Artículo 2. Ámbito de aplicación. Será de aplicación a las entidades recogidas en el art. 57.1.b) de la Ley 47/2003, de 26 de noviembre, publicada en el BOE núm. 288, de 2 de diciembre de 2003, sin perjuicio de lo dispuesto en el apartado 3."
+    },
+    {
+      "clipId": "g3a-84vxcned",
+      "file": null,
+      "audioMs": null,
+      "pair": 3,
+      "side": "left",
+      "text": "Letra a. El umbral máximo será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos."
+    },
+    {
+      "clipId": "g3a-9fgqyfm7",
+      "file": null,
+      "audioMs": null,
+      "pair": 3,
+      "side": "right",
+      "text": "a) El umbral máximo será de 1.234.567,89 euros."
+    },
+    {
+      "clipId": "g3a-33ffjjdj",
+      "file": null,
+      "audioMs": null,
+      "pair": 2,
+      "side": "left",
+      "text": "1.º Las entidades deberán remitir la información antes del día 15/07/2024 y, a más tardar, a las 14:00, hora peninsular."
+    },
+    {
+      "clipId": "g3a-8gnjjcmd",
+      "file": null,
+      "audioMs": null,
+      "pair": 2,
+      "side": "right",
+      "text": "Punto primero. Las entidades deberán remitir la información antes del quince de julio de dos mil veinticuatro y, a más tardar, a las catorce horas, hora peninsular."
+    },
+    {
+      "clipId": "g3a-nz3xrwhv",
+      "file": null,
+      "audioMs": null,
+      "pair": 1,
+      "side": "left",
+      "text": "No obstante, quedarán exentas las entidades a que se refiere el apartado tres, salvo que superen un ratio de solvencia del ocho coma cinco por ciento durante dos ejercicios consecutivos."
+    },
+    {
+      "clipId": "g3a-dwhcfpfy",
+      "file": null,
+      "audioMs": null,
+      "pair": 1,
+      "side": "right",
+      "text": "No obstante, quedarán exentas las entidades a que se refiere el apartado 3, salvo que superen un ratio de solvencia del 8,5 % durante dos ejercicios consecutivos."
+    }
+  ]
+}
