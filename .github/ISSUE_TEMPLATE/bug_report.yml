@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a defect (extraction, normalization, fidelity, playback, API)
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for the detailed report. Because this is a fidelity-critical
+        project, concrete inputs and exact outputs matter far more than
+        descriptions.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear, factual description of the defect.
+      placeholder: Listen mode read "31/02/2024" as ...
+    validations:
+      - required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened (and why, per the fidelity policy)?
+    validations:
+      - required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: >
+        Exact steps and, if possible, the smallest text/PDF input that
+        reproduces it. For normalization issues, paste the source line and the
+        Listen output (the Inspector "Source" vs "Spoken" panels help).
+      value: |
+        1. Load ...
+        2. Mode: Literal / Listen / Manual Gold
+        3. Segment: ...
+      render: text
+    validations:
+      - required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: false
+      options:
+        - Extraction (pdf.js/browser)
+        - Spoken rules (normalization)
+        - Fidelity validator
+        - TTS provider / API
+        - Cache
+        - Player / UI
+        - Docs
+    validations:
+      - required: true
+  - type: input
+    id: engine-version
+    attributes:
+      label: Spoken engine version
+      description: Shown in the UI stats bar (e.g. engine 1.0.0) and /api/health.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Node version, provider (mock/nan).
+      placeholder: Windows 11 / Chrome 130 / Node 22 / SPEECH_PROVIDER=mock
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmations
+      options:
+        - label: I removed any confidential document content from this report.
+          required: true
+        - label: I will not attach a copyrighted PDF unless redistribution is clearly permitted.
+          required: true

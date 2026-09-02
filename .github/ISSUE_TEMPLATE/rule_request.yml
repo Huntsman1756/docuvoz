@@ -1,0 +1,40 @@
+name: Normalization rule request
+description: Ask for a Spanish regulatory/financial pattern to be verbalized in Listen mode
+labels: [rules, "good first issue"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Propose a deterministic transformation. Include the literal
+        "source -> spoken" pair and explain why it preserves meaning. Any
+        summarization/paraphrase will be rejected: Listen is deterministic.
+  - type: textarea
+    id: pattern
+    attributes:
+      label: Source pattern
+      description: A representative literal string from Spanish financial/regulatory text.
+      placeholder: "plazo de T+2 días hábiles"
+    validations:
+      - required: true
+  - type: textarea
+    id: spoken
+    attributes:
+      label: Desired spoken form
+      description: Exactly how it should be read aloud.
+      placeholder: "plazo de T más dos días hábiles"
+    validations:
+      - required: true
+  - type: textarea
+    id: ambiguity
+    attributes:
+      label: Ambiguity / false positives
+      description: >
+        Where might this pattern be misread, and what should the rule do when
+        uncertain? (The correct default is usually: preserve the original.)
+    validations:
+      - required: true
+  - type: textarea
+    id: domain
+    attributes:
+      label: Domain context
+      description: Where this appears (BOE, CNMV, Banco de España, EUR-Lex, …).

@@ -1,0 +1,35 @@
+name: Feature / experiment proposal
+description: Propose a change to scope, architecture, or a Phase 0 experiment
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Phase 0 is deliberately narrow. Proposals that expand scope (accounts,
+        mobile, LLM rewriting, cloud sync, etc.) will likely be deferred — see
+        docs/phase-0.md "Anti-goals".
+  - type: textarea
+    id: problem
+    attributes:
+      label: What does this improve, experimentally?
+      description: Tie the proposal to a Phase 0 question / gate if you can.
+    validations:
+      - required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+    validations:
+      - required: true
+  - type: textarea
+    id: reversibility
+    attributes:
+      label: Reversibility & risk
+      description: How easy is this to remove if it turns out unnecessary?
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope honesty
+      options:
+        - label: I understand this stays within Phase 0 scope (or I am proposing to open a discussion about scope).
+          required: true
