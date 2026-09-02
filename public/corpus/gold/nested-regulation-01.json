@@ -1,6 +1,6 @@
 {
   "fixtureId": "nested-regulation-01",
-  "notice": "Manual Gold is a human-authored spoken upper bound for experiments (gate G3a). It is never produced by the automatic engine. b14/b22/b23 authored by the human reviewer (2026-09-02), transcribed verbatim.",
+  "notice": "Manual Gold is a human-authored spoken upper bound for experiments (gate G3a). It is never produced by the automatic engine.",
   "entries": [
     {
       "blockId": "b5",

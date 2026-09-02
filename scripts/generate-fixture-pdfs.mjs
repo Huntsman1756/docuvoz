@@ -8,7 +8,7 @@
  * No real copyrighted regulation is ever written. Re-run with:
  *   npm run fixtures
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildPdf } from "./pdf-writer.mjs";
@@ -130,6 +130,37 @@ function goldFile(fx, refDoc) {
   };
 }
 
+/**
+ * Manual Gold is human-authored experimental data (G3a/G4B). The def file
+ * (scripts/fixtures-def.mjs) is its canonical carrier so that regeneration
+ * is reproducible — but regeneration must NEVER silently degrade the human
+ * record. Fail loudly if the def would drop or mutate an existing gold
+ * entry: add it to the def first (verbatim, human text) or restore the
+ * gold JSON deliberately from git.
+ */
+function guardGoldRegression(path, next) {
+  if (!existsSync(path)) return;
+  let prev;
+  try {
+    prev = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return; // unreadable file will be overwritten; nothing to compare
+  }
+  const problems = [];
+  for (const e of prev.entries ?? []) {
+    const match = next.entries.find((n) => n.blockId === e.blockId);
+    if (!match) problems.push(`${e.blockId}: present on disk, missing from def`);
+    else if (match.spokenText !== e.spokenText)
+      problems.push(`${e.blockId}: spoken text differs from def`);
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      `gold regression guard: refusing to rewrite ${path}\n` +
+        problems.map((p) => `  - ${p}`).join("\n"),
+    );
+  }
+}
+
 const manifestEntries = [];
 
 for (const fx of fixtures) {
@@ -138,7 +169,8 @@ for (const fx of fixtures) {
   const refDoc = referenceDocument(fx);
   writeFileSync(join(outRef, `${fx.id}.json`), JSON.stringify(refDoc, null, 2));
   const gold = goldFile(fx, refDoc);
-  if (gold) writeFileSync(join(outGold, `${fx.id}.json`), JSON.stringify(gold, null, 2));
+  if (gold) guardGoldRegression(join(outGold, `${fx.id}.json`), gold);
+  if (gold) writeFileSync(join(outGold, `${fx.id}.json`), JSON.stringify(gold, null, 2) + "\n");
 
   manifestEntries.push({
     id: fx.id,

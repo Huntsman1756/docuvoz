@@ -121,6 +121,21 @@ export const fixtures = [
         spoken:
           "Punto segundo. Los importes superiores a quinientos mil euros deberán notificarse, además, en un plazo de dos días hábiles después de la fecha de operación, siempre que el contrato se haya celebrado con posterioridad al uno de enero de dos mil veinticuatro.",
       },
+      {
+        blockIndex: 10,
+        spoken:
+          "Letra be. El tipo aplicable será el resultado de incrementar el euríbor a doce meses en veinticinco puntos básicos.",
+      },
+      {
+        blockIndex: 15,
+        spoken:
+          "El modelo de informe deberá presentarse conforme al Anexo uno, que se publica en el sitio web del organismo. No podrá utilizarse el modelo del ejercicio dos mil veintitrés.",
+      },
+      {
+        blockIndex: 16,
+        spoken:
+          "Nota uno. Los porcentajes se calcularán sobre el balance auditado a treinta y uno de diciembre de dos mil veintitrés.",
+      },
     ],
   },
   {
