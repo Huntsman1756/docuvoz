@@ -113,7 +113,7 @@ G3A_PRODUCT_HYPOTHESIS        = OPEN   blind protocol prepared, ears required
 G3B_AUTOMATION_PROXY          = PASS   word-level Dice 0.95 — engineering regression ONLY
 G3B_HUMAN                     = OPEN   capture-ratio protocol prepared (Literal/Gold/Listen)
 G4A_CRITICAL_LITERAL_PRESERV. = PASS   0 violations, 0 silent losses (machine-verified)
-G4B_SEMANTIC_FIDELITY         = OPEN   human review packet prepared, not yet reviewed
+G4B_SEMANTIC_FIDELITY         = PASS   32/32 human verdicts post-fix — reviewed corpus ONLY
 PRODUCT_GO_NO_GO              = NOT_DECIDED
 ```
 

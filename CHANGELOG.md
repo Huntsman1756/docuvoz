@@ -12,6 +12,17 @@ changes are listed under the same headings.
 
 ### Changed
 
+- **Engine `1.1.0`** (`SPOKEN_ENGINE_VERSION`, invalidates audio cache): the
+  `legal-references` rule no longer destroys the sentence boundary after a
+  heading citation (`"Artículo 1. Objeto."` → `"artículo uno. Objeto."`, was
+  `"artículo unoObjeto."`) and keeps the plural in joint references
+  (`"artículos 121 y 122"` → `"artículos ciento veintiuno y ciento veintidós"`,
+  was `"artículo …"`). Both defects were found by the G4b human review
+  (round 1 FAILs on `s4`, `s5`, `s11`, `ea:s8`); round 2 re-review passed and
+  the untouched `golden:legal` row confirmed no regression.
+- `G1_TTS_LIVE = PASS` and `G4B_SEMANTIC_FIDELITY = PASS` recorded with
+  explicit, scope-limited meanings (`docs/phase-0.md`); G4b covers only the
+  32 reviewed Phase-0 corpus rows, not arbitrary regulatory documents.
 - **Gate vocabulary split (binding):** infrastructure status is now separate
   from validation status. `PHASE_0_INFRASTRUCTURE = PASS` no longer reads as
   Phase 0 completion; the decision state is `PRODUCT_GO_NO_GO = NOT_DECIDED`

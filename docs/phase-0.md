@@ -24,7 +24,7 @@ G3A_PRODUCT_HYPOTHESIS        = OPEN   (blind listening protocol prepared, not r
 G3B_AUTOMATION_PROXY          = PASS   (engineering regression metric ONLY — see below)
 G3B_HUMAN                     = OPEN   (requires G3A + A/B/C listening protocol)
 G4A_CRITICAL_LITERAL_PRESERV. = PASS   (machine-verified on corpus: 0 violations)
-G4B_SEMANTIC_FIDELITY         = OPEN   (human review packet prepared, not reviewed)
+G4B_SEMANTIC_FIDELITY         = PASS   (32/32 human verdicts after remediation; scope-limited)
 PRODUCT_GO_NO_GO              = NOT_DECIDED
 ```
 
@@ -54,6 +54,17 @@ What each PASS is allowed to mean, and nothing more:
   evaluated corpus. This is literal preservation only. Semantic faithfulness
   is `G4B`, judged by humans on a review packet — for a deterministic,
   conservative engine this is tractable without any LLM judge.
+- `G4B_SEMANTIC_FIDELITY = PASS` — 32/32 deterministic transformations in the
+  review packet carry a human verdict after remediation of 2 defect classes
+  found in round 1 (citation-boundary loss and plural destruction in
+  `legal-references`; engine 1.1.0). Verdicts and rounds:
+  `evaluation/experiments/g4b/review-results-2026-09-02.csv`; the filled packet
+  is committed next to this doc's experiment folder. This establishes semantic
+  fidelity **only for the reviewed Phase-0 corpus**; it does not establish
+  general semantic fidelity for arbitrary regulatory documents. Oral-quality
+  issues flagged by the reviewer (slash-citation reading, digit-by-digit
+  decimals, `ere`/`erre`, `cero céntimos`) remain open as _quality_, and are
+  neither closed nor hidden by this gate.
 
 What remains OPEN and why no technical green checkmark can close it:
 
