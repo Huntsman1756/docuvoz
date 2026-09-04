@@ -71,8 +71,13 @@ test("Play during preparation is remembered and auto-starts without refetching",
   await play.click();
   await play.click();
 
-  // The phase transitions through preparing → ready → playing.
-  await expect(page.locator("main")).toHaveAttribute("data-phase", /playing|ready/, {
+  // The queued play intent must auto-start once chunk 0 is ready.
+  // The most reliable observable proof: the button text changes from
+  // "Escuchar" to "Pausar".  After playback starts the phase may be
+  // "playing" (still running) or "ready" (short mock audio ended quickly),
+  // but "paused" is never correct here — it would mean the user pressed
+  // pause or a bug toggled the state.
+  await expect(page.getByRole("button", { name: /Pausar/ })).toBeVisible({
     timeout: 30_000,
   });
   // Dedupe invariant: each chunk text is requested at most once.
