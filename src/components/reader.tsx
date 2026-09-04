@@ -25,8 +25,11 @@ import {
 import {
   exportDocumentAudio,
   triggerDownload,
+  ExportCancelledError,
+  type ExportFormat,
   type ExportProgress,
-} from "@/lib/audio-export";
+} from "@/lib/export";
+import { ExportDialog } from "@/components/export-dialog";
 import { deriveReaderPhase, PHASE_LABELS } from "@/lib/reader-phase";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
@@ -65,6 +68,7 @@ export function Reader() {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [advanced, setAdvanced] = useState(false);
 
   const playerRef = useRef<BufferedSpeechPlayer | null>(null);
@@ -322,38 +326,53 @@ export function Reader() {
   }, []);
 
   /* ---- export ---- */
-  const runExport = useCallback(async () => {
-    const player = playerRef.current;
-    if (!player || totalChunks === 0 || exporting) return;
-    cancelExportRef.current = false;
-    setExporting(true);
-    setExportError(null);
-    setExportProgress({ done: 0, total: totalChunks });
-    try {
-      const blob = await exportDocumentAudio(totalChunks, (i) => player.blobFor(i), {
-        onProgress: setExportProgress,
-        isCancelled: () => cancelExportRef.current,
-      });
-      const base = (doc?.source.name ?? "documento").replace(/\.[^.]+$/, "");
-      triggerDownload(blob, `${base}.wav`);
-    } catch (error) {
-      const cancelled =
-        (error instanceof DOMException && error.name === "AbortError") ||
-        cancelExportRef.current;
-      if (cancelled) setExportError("Descarga cancelada.");
-      else
-        setExportError(
-          `Error al exportar: ${error instanceof Error ? error.message : "desconocido"}`,
-        );
-    } finally {
-      setExporting(false);
-      setExportProgress(null);
-    }
-  }, [doc, exporting, totalChunks]);
+  const runExport = useCallback(
+    async (format: ExportFormat, title: string, author: string) => {
+      const player = playerRef.current;
+      if (!player || totalChunks === 0 || exporting) return;
+      cancelExportRef.current = false;
+      setExporting(true);
+      setExportError(null);
+      setExportProgress({ done: 0, total: totalChunks });
+      try {
+        const blob = await exportDocumentAudio(totalChunks, (i) => player.blobFor(i), {
+          format,
+          metadata: { title: title || undefined, author: author || undefined },
+          onProgress: setExportProgress,
+          isCancelled: () => cancelExportRef.current,
+        });
+        const base = (title || (doc?.source.name ?? "documento")).replace(/\.[^.]+$/, "");
+        const ext = format === "m4a" ? ".m4a" : format === "mp3" ? ".mp3" : ".wav";
+        triggerDownload(blob, `${base}${ext}`);
+      } catch (error) {
+        const cancelled =
+          (error instanceof DOMException && error.name === "AbortError") ||
+          error instanceof ExportCancelledError ||
+          cancelExportRef.current;
+        if (cancelled) setExportError("Descarga cancelada.");
+        else
+          setExportError(
+            `Error al exportar: ${error instanceof Error ? error.message : "desconocido"}`,
+          );
+      } finally {
+        setExporting(false);
+        setExportProgress(null);
+      }
+    },
+    [doc, exporting, totalChunks],
+  );
 
   const cancelExport = useCallback(() => {
     cancelExportRef.current = true;
   }, []);
+
+  const openExportDialog = useCallback(() => {
+    if (exporting) {
+      cancelExport();
+    } else {
+      setShowExportDialog(true);
+    }
+  }, [exporting, cancelExport]);
 
   /* ---- explicit reader phase (product-facing state machine) ---- */
   const firstReady = prepared >= 1 || playerState !== "idle";
@@ -769,10 +788,36 @@ export function Reader() {
             type="button"
             className="reader-download"
             aria-label={exporting ? "cancelar descarga" : "descargar audio"}
-            onClick={() => (exporting ? cancelExport() : void runExport())}
+            onClick={openExportDialog}
           >
             {exporting ? "Cancelando…" : "⬇ Audio"}
           </button>
+        </div>
+      )}
+
+      {/* ——— Export dialog (modal popover) ——— */}
+      {showExportDialog && (
+        <div
+          className="export-overlay"
+          onClick={() => !exporting && setShowExportDialog(false)}
+        >
+          <div className="export-overlay-panel" onClick={(e) => e.stopPropagation()}>
+            <ExportDialog
+              title={doc?.source.name?.replace(/\.[^.]+$/, "") ?? ""}
+              author=""
+              onExport={(fmt, t, a) => {
+                setShowExportDialog(false);
+                void runExport(fmt, t, a);
+              }}
+              onCancel={() => {
+                if (exporting) cancelExport();
+                else setShowExportDialog(false);
+              }}
+              exporting={exporting}
+              progressPct={exportPct}
+              error={exportError}
+            />
+          </div>
         </div>
       )}
     </main>

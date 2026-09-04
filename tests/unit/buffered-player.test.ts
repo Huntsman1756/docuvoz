@@ -251,12 +251,10 @@ describe("BufferedSpeechPlayer: seekByTime", () => {
 
 describe("BufferedSpeechPlayer: playback rate", () => {
   it("setPlaybackRate does not trigger new fetch", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
-        fetchCount++;
         await new Promise((r) => setTimeout(r, 10));
         return makeSpeechResponse(makeBlob(64));
       }
@@ -270,7 +268,6 @@ describe("BufferedSpeechPlayer: playback rate", () => {
     player.prepare();
     await new Promise((r) => setTimeout(r, 100));
 
-    const countBefore = fetchCount;
     player.setPlaybackRate(1.5);
     player.setPlaybackRate(0.75);
     player.setPlaybackRate(2);

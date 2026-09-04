@@ -29,10 +29,9 @@
  *  19. Rapid Play/Pause does not duplicate audio
  *  20. Export and playback do not corrupt each other's state
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { BufferedSpeechPlayer } from "@/lib/buffered-player";
 import type { BufferedPlayerEvents } from "@/lib/buffered-player";
-import type { PlayerMetrics } from "@/lib/speech-player";
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
@@ -133,10 +132,10 @@ describe("Test 1: Next chunk prepared before current ends", () => {
   it("prefetchDepth=2 means chunks 1 and 2 are ready while chunk 0 plays", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
+        fetchCount++;
         await new Promise((r) => setTimeout(r, 5));
         return makeSpeechResponse(makeBlob(64));
       }
@@ -168,11 +167,11 @@ describe("Test 2: Scheduled chunks do not overlap", () => {
     let fetchCount = 0;
     const order: number[] = [];
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
         order.push(fetchCount);
+        fetchCount++;
         await new Promise((r) => setTimeout(r, 5));
         return makeSpeechResponse(makeBlob(64));
       }
@@ -200,7 +199,6 @@ describe("Test 2: Scheduled chunks do not overlap", () => {
 
 describe("Test 3: Pause preserves position", () => {
   it("state transitions are correct for pause", async () => {
-    const fetchCount = 0;
     const fetchMock = createFetchMock({ latencyMs: 5, blobSize: 64 });
 
     const stateChanges: string[] = [];
@@ -230,7 +228,6 @@ describe("Test 3: Pause preserves position", () => {
 
 describe("Test 4: Resume continues from correct position", () => {
   it("resume when not paused is safe (no-op)", async () => {
-    const fetchCount = 0;
     const fetchMock = createFetchMock({ latencyMs: 5, blobSize: 64 });
 
     const events = makeEvents();
@@ -253,9 +250,7 @@ describe("Test 4: Resume continues from correct position", () => {
 
 describe("Test 5: Seek invalidates stale scheduled audio", () => {
   it("seekToChunk without autoplay updates index", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
@@ -287,10 +282,10 @@ describe("Test 6: Speed change does not generate TTS requests", () => {
   it("changing playback rate does not trigger new synthesis", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
+        fetchCount++;
         await new Promise((r) => setTimeout(r, 5));
         return makeSpeechResponse(makeBlob(64));
       }
@@ -325,9 +320,7 @@ describe("Test 6: Speed change does not generate TTS requests", () => {
 describe("Test 7: Document switch cancels previous schedule", () => {
   it("destroy during prepare does not leak AbortError", async () => {
     let errorCalled = false;
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request, init?: RequestInit) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
@@ -532,9 +525,7 @@ describe("Test 11: Real errors surface", () => {
 
 describe("Test 12: Document end transitions cleanly", () => {
   it("prepare completes with all chunks ready", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
@@ -568,9 +559,7 @@ describe("Test 12: Document end transitions cleanly", () => {
 
 describe("Test 13: Word boundary follows playback clock", () => {
   it("player exposes supportsWordBoundaries from provider metadata", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
@@ -599,9 +588,7 @@ describe("Test 13: Word boundary follows playback clock", () => {
 
 describe("Test 14: Fallback highlighting without boundaries", () => {
   it("chunk-level tracking works when word boundaries are absent", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
@@ -634,9 +621,7 @@ describe("Test 14: Fallback highlighting without boundaries", () => {
 
 describe("Test 15: Long document bounded memory", () => {
   it("500 chunks does not crash the player", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
@@ -669,10 +654,10 @@ describe("Test 16: Replay from cache works", () => {
   it("blobFor deduplication prevents duplicate fetches", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
+        fetchCount++;
         await new Promise((r) => setTimeout(r, 5));
         return makeSpeechResponse(makeBlob(64));
       }
@@ -741,10 +726,10 @@ describe("Test 18: Mid-stream rebuffer recovers", () => {
     const shouldFail = true;
 
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
+        fetchCount++;
         if (shouldFail && fetchCount < 3) {
           // Fail first few requests
           return makeSpeechErrorResponse("provider_error");
@@ -755,11 +740,8 @@ describe("Test 18: Mid-stream rebuffer recovers", () => {
       return makeHealthResponse();
     };
 
-    let errorCalled = false;
     const events = makeEvents({
-      onError: () => {
-        errorCalled = true;
-      },
+      onError: () => {},
     });
 
     const player = new BufferedSpeechPlayer(makeChunks(5), events, {
@@ -779,7 +761,6 @@ describe("Test 18: Mid-stream rebuffer recovers", () => {
 
 describe("Test 19: Rapid Play/Pause", () => {
   it("rapid state changes do not cause corruption", async () => {
-    const fetchCount = 0;
     const fetchMock = createFetchMock({ latencyMs: 10, blobSize: 64 });
 
     const stateChanges: string[] = [];
@@ -822,9 +803,7 @@ describe("Test 19: Rapid Play/Pause", () => {
 
 describe("Test 20: Export/playback state isolation", () => {
   it("blobFor and prepare can coexist without state corruption", async () => {
-    let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
-      fetchCount++;
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
