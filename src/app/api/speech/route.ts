@@ -13,14 +13,14 @@ let limiter: SlidingWindowRateLimiter | null = null;
 let cache: FileAudioCache | null = null;
 
 function runtime() {
-  const { config, provider } = getServerRuntime();
+  const { config, provider, engines } = getServerRuntime();
   limiter ??= new SlidingWindowRateLimiter(config.API_RATE_LIMIT_PER_MINUTE);
   cache ??= new FileAudioCache(config.SPEECH_CACHE_DIR);
-  return { config, provider, limiter, cache };
+  return { config, provider, engines, limiter, cache };
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const { config, provider, limiter, cache } = runtime();
+  const { config, provider, engines, limiter, cache } = runtime();
   const logger = createLogger({ component: "api.speech" });
 
   const length = Number(request.headers.get("content-length") ?? "0");
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const result = await handleSpeech(
     raw,
     clientKeyFromHeaders(request.headers),
-    { config, provider, cache, limiter, logger },
+    { config, provider, engines, cache, limiter, logger },
     request.signal,
   );
   return toResponse(result);

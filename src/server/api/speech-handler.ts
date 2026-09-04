@@ -11,10 +11,11 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { SpeechError, type SpeechProvider } from "@/domain/speech/types";
+import { isValidEdgeVoice } from "@/adapters/speech-providers/edge-provider";
 import { computeAudioCacheKey } from "@/infrastructure/cache/cache-key";
 import { FileAudioCache } from "@/infrastructure/cache/file-audio-cache";
 import { contentFingerprint, type Logger } from "@/infrastructure/logging/logger";
-import type { ServerConfig } from "../config";
+import type { EngineRuntime, ServerConfig } from "../config";
 import { SlidingWindowRateLimiter } from "../rate-limit";
 
 export const SpeechRequestSchema = z.object({
@@ -22,6 +23,8 @@ export const SpeechRequestSchema = z.object({
   voice: z.string().min(1).max(64).optional(),
   speed: z.number().min(0.5).max(2).optional(),
   format: z.enum(["mp3", "wav", "opus", "flac"]).optional(),
+  /** Selectable synthesis engine (opaque id; "default" is always present). */
+  engine: z.string().min(1).max(32).optional(),
 });
 
 export type SpeechRequestBody = z.infer<typeof SpeechRequestSchema>;
@@ -29,6 +32,9 @@ export type SpeechRequestBody = z.infer<typeof SpeechRequestSchema>;
 export interface HandlerDeps {
   config: ServerConfig;
   provider: SpeechProvider;
+  /** Engine registry; `provider` must be the provider of the first entry.
+   * When omitted, every request is served by `provider` (legacy behavior). */
+  engines?: EngineRuntime[];
   cache: FileAudioCache;
   limiter: SlidingWindowRateLimiter;
   logger: Logger;
@@ -44,6 +50,36 @@ export interface HandlerResponse {
 
 export function parseSpeechRequest(raw: unknown): SpeechRequestBody {
   return SpeechRequestSchema.parse(raw);
+}
+
+/**
+ * Map a client-facing engine id to its server runtime. Unknown ids fall back
+ * to the default engine (a stale tab with a removed engine must keep working);
+ * with no registry configured, the legacy single-provider behavior is
+ * reproduced exactly so existing deployments and tests are unaffected.
+ */
+export function resolveEngine(
+  deps: HandlerDeps,
+  requested: string | undefined,
+): { engine: EngineRuntime; fellBack: boolean } {
+  const id = requested ?? "default";
+  if (!deps.engines) {
+    const isNan = deps.config.SPEECH_PROVIDER === "nan";
+    return {
+      engine: {
+        id: "default",
+        label: "Estándar",
+        provider: deps.provider,
+        model: isNan ? deps.config.NAN_TTS_MODEL : "mock-v1",
+        defaultVoice: isNan ? deps.config.NAN_TTS_VOICE : "mock",
+        format: isNan ? deps.config.NAN_TTS_FORMAT : "wav",
+      },
+      fellBack: false,
+    };
+  }
+  const found = deps.engines.find((e) => e.id === id);
+  if (found) return { engine: found, fellBack: false };
+  return { engine: deps.engines[0], fellBack: true };
 }
 
 export async function handleSpeech(
@@ -70,16 +106,32 @@ export async function handleSpeech(
     );
   }
 
+  const { engine } = resolveEngine(deps, parsed.data.engine);
+  const requestedVoice = parsed.data.voice;
+  // Edge voices land inside an SSML attribute server-side; reject anything but
+  // the known neural pattern rather than trusting the browser's catalog.
+  const voice =
+    engine.provider.name === "edge" && requestedVoice && !isValidEdgeVoice(requestedVoice)
+      ? undefined
+      : requestedVoice;
+  if (
+    engine.provider.name === "edge" &&
+    requestedVoice &&
+    !isValidEdgeVoice(requestedVoice)
+  ) {
+    deps.logger.warn(
+      { event: "speech", outcome: "invalid_voice", provider: engine.provider.name },
+      "rejected edge voice name not matching the neural pattern; falling back to engine default",
+    );
+  }
   const settings = {
-    provider: deps.provider.name,
-    model: deps.config.SPEECH_PROVIDER === "nan" ? deps.config.NAN_TTS_MODEL : "mock-v1",
-    voice:
-      parsed.data.voice ??
-      (deps.config.SPEECH_PROVIDER === "nan" ? deps.config.NAN_TTS_VOICE : "mock"),
+    provider: engine.provider.name,
+    model: engine.model,
+    voice: voice ?? engine.defaultVoice,
     speed: parsed.data.speed ?? deps.config.SPEECH_DEFAULT_SPEED,
-    format:
-      parsed.data.format ??
-      (deps.config.SPEECH_PROVIDER === "nan" ? deps.config.NAN_TTS_FORMAT : "wav"),
+    // The engine decides its own container; a mismatched format request must
+    // not silently produce audio the cache will mislabel.
+    format: engine.format,
   };
   const key = await computeAudioCacheKey(text, settings);
 
@@ -111,7 +163,7 @@ export async function handleSpeech(
   }
 
   try {
-    const result = await deps.provider.synthesize({ text, settings, signal });
+    const result = await engine.provider.synthesize({ text, settings, signal });
     // The audio is content-addressed and valid even if the caller aborted:
     // cache it anyway so a subsequent request hits.
     deps.cache.set(key, result);

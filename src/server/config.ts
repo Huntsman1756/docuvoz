@@ -1,10 +1,16 @@
 /**
  * Server-side configuration. Validated eagerly at startup (see
  * src/instrumentation.ts). Fail-fast with a clear message; never print secrets.
+ *
+ * The runtime exposes an ENGINE REGISTRY (Personal Reader v0.3): engine id 0
+ * is the default (NaN/Kokoro or mock), and optional premium engines (Edge TTS
+ * neural voices) can be enabled per deployment. The browser picks an engine
+ * by opaque id — internal provider names stay in /lab and the logs.
  */
 import { z } from "zod";
 import { MockSpeechProvider } from "@/adapters/speech-providers/mock-provider";
 import { NanSpeechProvider } from "@/adapters/speech-providers/nan-provider";
+import { EdgeSpeechProvider } from "@/adapters/speech-providers/edge-provider";
 import { PacedProvider } from "@/adapters/speech-providers/pacing";
 import type { SpeechProvider } from "@/domain/speech/types";
 
@@ -12,6 +18,8 @@ import type { SpeechProvider } from "@/domain/speech/types";
 // this coercion the verbatim `.env.example -> .env.local` copy fails validation
 // even in mock mode (onboarding bug found dogfooding). Treat blank as "unset".
 const blankToUndefined = (v: unknown) => (v === "" || v === undefined ? undefined : v);
+// Explicit truthy set: `z.coerce.boolean()` would turn "false"/"0" into true.
+const toFlag = (v: unknown) => v === true || v === "1" || v === "true";
 
 const EnvSchema = z.object({
   SPEECH_PROVIDER: z.enum(["mock", "nan"]).default("mock"),
@@ -23,6 +31,9 @@ const EnvSchema = z.object({
   NAN_TTS_MODEL: z.string().default("kokoro"),
   NAN_TTS_VOICE: z.string().default("ef_dora"),
   NAN_TTS_FORMAT: z.string().default("mp3"),
+  // Optional second engine: free Microsoft Edge neural voices, strong Spanish.
+  EDGE_TTS_ENABLED: z.preprocess((v) => toFlag(v), z.boolean().default(false)),
+  EDGE_TTS_VOICE: z.string().default("es-ES-XimenaNeural"),
   SPEECH_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
   SPEECH_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
   SPEECH_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(120).default(20),
@@ -61,16 +72,19 @@ export function loadConfig(
   return config;
 }
 
-export function createProvider(config: ServerConfig): SpeechProvider {
-  const inner: SpeechProvider =
-    config.SPEECH_PROVIDER === "nan"
-      ? new NanSpeechProvider({
-          baseUrl: config.NAN_BASE_URL as string,
-          apiKey: config.NAN_API_KEY as string,
-          timeoutMs: config.SPEECH_TIMEOUT_MS,
-        })
-      : new MockSpeechProvider({ latencyMs: 150 });
+/** One selectable synthesis engine: what the browser may address by id. */
+export interface EngineRuntime {
+  id: string;
+  /** Product-facing label (never a provider brand). */
+  label: string;
+  provider: SpeechProvider;
+  model: string;
+  defaultVoice: string;
+  /** Container this engine serves; the browser must not override it. */
+  format: string;
+}
 
+function pace(config: ServerConfig, inner: SpeechProvider): SpeechProvider {
   return new PacedProvider(inner, {
     maxConcurrency: config.SPEECH_MAX_CONCURRENCY,
     // Account for provider-specific pacing (e.g. Kokoro plans): derive the
@@ -80,16 +94,70 @@ export function createProvider(config: ServerConfig): SpeechProvider {
   });
 }
 
+export function createEngines(config: ServerConfig): EngineRuntime[] {
+  const engines: EngineRuntime[] = [];
+  if (config.SPEECH_PROVIDER === "nan") {
+    engines.push({
+      id: "default",
+      label: "Estándar",
+      provider: pace(
+        config,
+        new NanSpeechProvider({
+          baseUrl: config.NAN_BASE_URL as string,
+          apiKey: config.NAN_API_KEY as string,
+          timeoutMs: config.SPEECH_TIMEOUT_MS,
+        }),
+      ),
+      model: config.NAN_TTS_MODEL,
+      defaultVoice: config.NAN_TTS_VOICE,
+      format: config.NAN_TTS_FORMAT,
+    });
+  } else {
+    engines.push({
+      id: "default",
+      label: "Estándar",
+      provider: pace(config, new MockSpeechProvider({ latencyMs: 150 })),
+      model: "mock-v1",
+      defaultVoice: "mock",
+      format: "wav",
+    });
+  }
+  if (config.EDGE_TTS_ENABLED) {
+    engines.push({
+      id: "premium",
+      label: "Premium",
+      provider: pace(
+        config,
+        new EdgeSpeechProvider({ timeoutMs: config.SPEECH_TIMEOUT_MS }),
+      ),
+      model: "edge-neural-1",
+      defaultVoice: config.EDGE_TTS_VOICE,
+      format: "mp3",
+    });
+  }
+  return engines;
+}
+
+export function createProvider(config: ServerConfig): SpeechProvider {
+  return createEngines(config)[0].provider;
+}
+
 /** Singleton wired at startup; routes import this, never env directly. */
-let cached: { config: ServerConfig; provider: SpeechProvider } | null = null;
+let cached: {
+  config: ServerConfig;
+  engines: EngineRuntime[];
+  provider: SpeechProvider;
+} | null = null;
 
 export function getServerRuntime(): {
   config: ServerConfig;
+  engines: EngineRuntime[];
   provider: SpeechProvider;
 } {
   if (!cached) {
     const config = loadConfig();
-    cached = { config, provider: createProvider(config) };
+    const engines = createEngines(config);
+    cached = { config, engines, provider: engines[0].provider };
   }
   return cached;
 }

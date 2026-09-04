@@ -5,21 +5,31 @@ export const dynamic = "force-dynamic";
 
 /**
  * Non-secret runtime descriptor. The client uses these defaults to compute
- * identical cache keys; nothing here reveals credentials.
+ * identical cache keys; nothing here reveals credentials. `engines` is the
+ * selectable synthesis-engine registry (Personal Reader v0.3): each entry's
+ * provider/model/format is exactly what the server folds into the cache key,
+ * so the browser can pre-populate IndexedDB under matching keys.
  */
 export async function GET(): Promise<Response> {
   try {
-    const { config } = getServerRuntime();
-    const isNan = config.SPEECH_PROVIDER === "nan";
+    const { config, engines } = getServerRuntime();
+    const def = engines[0];
     return Response.json({
       ok: true,
-      provider: isNan ? "nan" : "mock",
-      model: isNan ? config.NAN_TTS_MODEL : "mock-v1",
-      voice: isNan ? config.NAN_TTS_VOICE : "mock",
+      provider: def.provider.name,
+      model: def.model,
+      voice: def.defaultVoice,
       speed: config.SPEECH_DEFAULT_SPEED,
-      format: isNan ? config.NAN_TTS_FORMAT : "wav",
+      format: def.format,
       maxTextChars: config.SPEECH_MAX_TEXT_CHARS,
       spokenEngineVersion: SPOKEN_ENGINE_VERSION,
+      engines: engines.map((e) => ({
+        id: e.id,
+        label: e.label,
+        provider: e.provider.name,
+        model: e.model,
+        format: e.format,
+      })),
     });
   } catch {
     return Response.json({ ok: false, error: "misconfigured" }, { status: 500 });
