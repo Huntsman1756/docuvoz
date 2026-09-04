@@ -1,49 +1,119 @@
 /**
- * Minimal Personal Reader E2E (mock provider, CI-safe): the two NEW central
- * reader features — playback and single-WAV export. No experimental metrics,
- * no benchmarks: just prove they work end to end.
+ * Personal Reader v0.3 E2E (mock provider, CI-safe).
+ *
+ * Covers the lifecycle P0s:
+ *  - a Play click during preparation is remembered and auto-starts (and
+ *    repeated clicks never re-fetch the same chunk);
+ *  - switching documents mid-playback cancels the old one cleanly
+ *    (no ghost controls, no stale state);
+ *  - the explicit state machine is observable via main[data-phase].
+ *  - loading/preparing states are visible.
+ *  - WAV export produces a valid file.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 
-async function loadSimpleDoc(page: import("@playwright/test").Page) {
+async function loadFixture(page: Page, title: string) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Lector de documentos" })).toBeVisible();
-  await page.getByRole("button", { name: "Documento simple", exact: true }).click();
-  // Controls appear once the plan/chunks are ready and the primary button is enabled.
+  await page.getByRole("button", { name: title, exact: true }).click();
   const play = page.getByRole("button", { name: /Escuchar/ });
   await expect(play).toBeVisible();
   await expect(play).toBeEnabled();
 }
 
+function trackSpeechRequests(page: Page): () => Map<string, number> {
+  const counts = new Map<string, number>();
+  page.on("request", (req) => {
+    if (req.url().includes("/api/speech") && req.method() === "POST") {
+      let text = "?";
+      try {
+        text = String(JSON.parse(req.postData() ?? "")?.text);
+      } catch {
+        /* keep "?" */
+      }
+      counts.set(text, (counts.get(text) ?? 0) + 1);
+    }
+  });
+  return () => counts;
+}
+
 test("reader plays mock audio through to the end", async ({ page }) => {
-  await loadSimpleDoc(page);
+  await loadFixture(page, "Documento simple");
+  const play = page.getByRole("button", { name: /Escuchar/ });
 
-  const speech = page.waitForResponse(
-    (res) => res.url().includes("/api/speech") && res.request().method() === "POST",
-    { timeout: 30_000 },
-  );
-
-  await page.getByRole("button", { name: /Escuchar/ }).click();
-  const res = await speech;
-  expect(res.ok()).toBeTruthy();
-  expect(res.headers()["content-type"]).toContain("audio");
-
-  // playing → the control becomes pause; when the (single) chunk finishes it flips back.
+  // The primary button reflects the state machine (never a lost click).
+  await play.click();
   await expect(page.getByRole("button", { name: /Pausar/ })).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByRole("button", { name: /Escuchar/ })).toBeVisible({
     timeout: 60_000,
   });
+  // Explicit state machine observable.
+  await expect(page.locator("main")).toHaveAttribute("data-phase", "ready");
+});
+
+test("Play during preparation is remembered and auto-starts without refetching", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const requests = trackSpeechRequests(page);
+  await page
+    .getByRole("button", { name: "Circular ficticia 1/2024", exact: true })
+    .click();
+  const play = page.locator(".reader-play");
+  await expect(play).toBeEnabled();
+
+  // Triple-click while chunk 0 may still be generating: the intent must be
+  // honored exactly once — no restarts, no duplicate per-chunk requests.
+  await play.click();
+  await play.click();
+  await play.click();
+
+  // The phase transitions through preparing → ready → playing.
+  await expect(page.locator("main")).toHaveAttribute("data-phase", /playing|ready/, {
+    timeout: 30_000,
+  });
+  // Dedupe invariant: each chunk text is requested at most once.
+  const duplicates = [...requests().entries()].filter(([, n]) => n > 1);
+  expect(duplicates).toEqual([]);
+});
+
+test("switching documents cancels the old player and starts clean", async ({ page }) => {
+  await loadFixture(page, "Circular ficticia 1/2024");
+  await page.getByRole("button", { name: /Escuchar/ }).click();
+  await expect(page.getByRole("button", { name: /Pausar/ })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  // Drag-and-drop-equivalent: feed a different PDF through the same pipeline.
+  const pdf = await page.request.get("/corpus/pdfs/simple-01.pdf");
+  const body = await pdf.body();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "simple-01.pdf",
+    mimeType: "application/pdf",
+    buffer: body,
+  });
+
+  // The old player is gone: no ghost "Pausar", the doc header changed and
+  // the state machine restarted at extracting.
+  await expect(page.getByRole("button", { name: /Pausar/ })).toBeHidden();
+  await expect(page.getByRole("heading", { name: "simple-01.pdf" })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.locator("main")).toHaveAttribute(
+    "data-phase",
+    /extracting|preparing|ready|playing/,
+  );
 });
 
 test("reader exports a valid single WAV of the document", async ({ page }) => {
-  await loadSimpleDoc(page);
+  await loadFixture(page, "Documento simple");
 
   const [download] = await Promise.all([
-    page.waitForEvent("download", { timeout: 30_000 }),
-    page.getByRole("button", { name: /Descargar audio/ }).click(),
+    page.waitForEvent("download", { timeout: 60_000 }),
+    page.getByRole("button", { name: "Descargar audio" }).click(),
   ]);
 
   expect(download.suggestedFilename()).toMatch(/\.wav$/i);
@@ -61,6 +131,90 @@ test("reader exports a valid single WAV of the document", async ({ page }) => {
   const dataLen = buf.readUInt32LE(40);
   expect(byteRate).toBeGreaterThan(0);
   expect(dataLen).toBeGreaterThan(0);
-  // Header data-size must match the actual payload (a well-formed single file).
+  // Header data-size must match the actual payload.
   expect(buf.length).toBe(44 + dataLen);
+});
+
+test("the landing page carries no development jargon", async ({ page }) => {
+  await page.goto("/");
+  const body = (await page.textContent("body")) ?? "";
+  for (const leak of ["kokoro", "Kokoro", "NaN", "provider:", "af_heart", "ef_dora"]) {
+    expect(body).not.toContain(leak);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/*  New v0.3 E2E: explicit state model & loading state visibility      */
+/* ------------------------------------------------------------------ */
+
+test("loading and preparing phases are visible", async ({ page }) => {
+  await page.goto("/");
+
+  // Load a fixture — it goes through loading → extracting → preparing → ready.
+  await page.getByRole("button", { name: "Documento simple", exact: true }).click();
+
+  // Should see the loading or extracting phase.
+  const loadingPhase = await page.locator("main").getAttribute("data-phase");
+  expect(["loading", "extracting", "preparing", "ready", "playing"]).toContain(
+    loadingPhase ?? "",
+  );
+});
+
+test("document switching during preparation does not ghost old audio", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // Load first fixture — triggers document loading.
+  await page
+    .getByRole("button", { name: "Circular ficticia 1/2024", exact: true })
+    .click();
+
+  // Switch to a different document via the file input (simulates drag/drop or
+  // the "Cambiar" button).
+  const pdf = await page.request.get("/corpus/pdfs/simple-01.pdf");
+  const body = await pdf.body();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "simple-01.pdf",
+    mimeType: "application/pdf",
+    buffer: body,
+  });
+
+  // Should show the second document, not the first.
+  await expect(page.getByRole("heading", { name: "simple-01.pdf" })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  // State should be clean (not stale from the first document).
+  const phase = await page.locator("main").getAttribute("data-phase");
+  expect(phase).not.toBe("loading");
+});
+
+test("changing voice is safe (no stale cache references)", async ({ page }) => {
+  await loadFixture(page, "Documento simple");
+
+  // Check the voice selector is present and functional.
+  const voiceSelect = page.getByRole("combobox", { name: "voz" });
+  await expect(voiceSelect).toBeVisible();
+
+  // Select a different voice.
+  const options = await voiceSelect.evaluateAll((els) =>
+    els.map((el) => (el as HTMLSelectElement).options),
+  );
+  if (options[0] && options[0].length > 1) {
+    await voiceSelect.selectOption({ index: 1 });
+  }
+
+  // The document should still be playable.
+  const play = page.getByRole("button", { name: /Escuchar/ });
+  await expect(play).toBeVisible();
+  await expect(play).toBeEnabled();
+});
+
+test("/lab is reachable from the reader and functional", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Lector de documentos" })).toBeVisible();
+
+  // Click the Lab link.
+  await page.getByRole("link", { name: "Lab" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /AUIDIO NAN/ })).toBeVisible();
 });

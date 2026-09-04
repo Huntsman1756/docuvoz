@@ -9,9 +9,9 @@ test("personal reader lands at / and links to the lab", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Lector de documentos" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Selecciona tu PDF", exact: true }),
+    page.getByRole("button", { name: "Seleccionar PDF", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: /Modo laboratorio/ }).click();
+  await page.getByRole("link", { name: /Lab/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: /AUIDIO NAN/ })).toBeVisible();
 });
 
