@@ -5,6 +5,7 @@
  * raw extraction phase, player state, and preparation progress.
  */
 import type { PlayerState } from "@/lib/speech-player";
+import type { BufferedPlayerState } from "@/lib/buffered-player";
 
 export type ReaderPhase =
   | "empty"
@@ -47,7 +48,7 @@ export const PHASE_LABELS: Record<ReaderPhase, string> = {
  */
 export function deriveReaderPhase(
   rawPhase: "empty" | "loading" | "extracting" | "ready" | "error",
-  playerState: PlayerState,
+  playerState: PlayerState | BufferedPlayerState,
   preparing: boolean,
   firstReady: boolean,
   queuedPlay: boolean,

@@ -8,11 +8,9 @@ import { buildSpokenPlan } from "@/domain/spoken/pipeline";
 import { planChunks } from "@/domain/spoken/speech-plan";
 import { extractPdf, sha256Hex } from "@/adapters/document-parsers/browser-loader";
 import { hasPdfMagic, validatePdfFile } from "@/lib/ingest";
-import {
-  SpeechPlayer,
-  type EngineDescriptor,
-  type PlayerState,
-} from "@/lib/speech-player";
+import { BufferedSpeechPlayer } from "@/lib/buffered-player";
+import type { BufferedPlayerState } from "@/lib/buffered-player";
+import type { EngineDescriptor } from "@/lib/speech-player";
 import { loadManifest, type CorpusManifest } from "@/lib/corpus";
 import {
   detectLanguage,
@@ -33,14 +31,20 @@ import { deriveReaderPhase, PHASE_LABELS } from "@/lib/reader-phase";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
 const MIN_CHUNK_CHARS = 200;
-/** ~ Spanish narration cadence, for the listen-time estimate only. */
+/** Spanish narration cadence, for the listen-time estimate only. */
 const CHARS_PER_MINUTE = 840;
+
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return "00:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
 
 export function Reader() {
   const [corpus, setCorpus] = useState<CorpusManifest | null>(null);
   const [engines, setEngines] = useState<EngineDescriptor[]>([]);
   const [doc, setDoc] = useState<StructuredDocument | null>(null);
-  // The underlying phase from the document lifecycle (raw extraction state).
   const [rawPhase, setRawPhase] = useState<
     "empty" | "loading" | "extracting" | "ready" | "error"
   >("empty");
@@ -50,27 +54,29 @@ export function Reader() {
   const [engineChoice, setEngineChoice] = useState<EngineChoice>("auto");
   const [voice, setVoice] = useState<string>(() => defaultVoice("es", "default"));
   const [rate, setRate] = useState(1);
-  const [playerState, setPlayerState] = useState<PlayerState>("idle");
+  const [playerState, setPlayerState] = useState<BufferedPlayerState>("idle");
   const [chunkIndex, setChunkIndex] = useState(0);
-  // Preparation progress stamped with the player config signature.
   const [prep, setPrep] = useState<{ sig: string; ready: number; failed: boolean }>({
     sig: "",
     ready: 0,
     failed: false,
   });
-  // Queued play intent: set when the user clicks Play before audio is ready.
   const [queuedPlay, setQueuedPlay] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [advanced, setAdvanced] = useState(false);
 
-  const playerRef = useRef<SpeechPlayer | null>(null);
-  // Document generation guard: every load bumps it; stale async work checks it.
+  const playerRef = useRef<BufferedSpeechPlayer | null>(null);
   const genRef = useRef(0);
   const pendingPlayRef = useRef(false);
   const cancelExportRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSegRef = useRef<HTMLParagraphElement | null>(null);
+
+  /* ---- current time position (seconds) ---- */
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   /* ---- initialisation ---- */
   useEffect(() => {
@@ -95,7 +101,6 @@ export function Reader() {
   const availableEngines = useMemo(() => engines.map((e) => e.id as EngineId), [engines]);
   const engineId = resolveEngine(engineChoice, effLang, availableEngines);
   const voices = voicesFor(effLang, engineId);
-  // When language/engine changes, fall back to a valid voice.
   const activeVoice = voices.some((v) => v.id === voice)
     ? voice
     : defaultVoice(effLang, engineId);
@@ -112,7 +117,6 @@ export function Reader() {
   const playerSig = `${doc?.id ?? "-"}|${mode}|${activeVoice}|${engineId}`;
   const prepared = prep.sig === playerSig ? prep.ready : 0;
   const prepareFailed = prep.sig === playerSig && prep.failed;
-  // Derived: background preparation is still running.
   const preparing = rawPhase === "ready" && !prepareFailed && prepared < totalChunks;
   const totalChars = useMemo(
     () => chunks.reduce((n, c) => n + c.text.length, 0),
@@ -128,7 +132,7 @@ export function Reader() {
       return;
     }
     const sig = playerSig;
-    const player = new SpeechPlayer(
+    const player = new BufferedSpeechPlayer(
       chunks,
       {
         onStateChange: (s) => {
@@ -140,6 +144,10 @@ export function Reader() {
         },
         onChunkChange: setChunkIndex,
         onMetrics: () => {},
+        onTimeUpdate: (pos, dur) => {
+          setCurrentTime(pos);
+          setDuration(dur);
+        },
         onError: (code) => {
           if (code === "prepare_failed") {
             setPrep((p) => ({
@@ -194,6 +202,8 @@ export function Reader() {
     setQueuedPlay(false);
     setPlayerState("idle");
     setChunkIndex(0);
+    setCurrentTime(0);
+    setDuration(0);
     setPrep({ sig: "", ready: 0, failed: false });
     setErrorText(null);
     return gen;
@@ -296,9 +306,7 @@ export function Reader() {
       player.resume();
       return;
     }
-    // During preparation, record the intent — it will auto-start when chunk 0
-    // is ready.  Multiple clicks are safe: play() returns early when already
-    // in the "loading" state for the same chunk.
+    // During preparation, record the intent — auto-starts when chunk 0 is ready.
     if (player.preparedCount < 1) {
       pendingPlayRef.current = true;
       setQueuedPlay(true);
@@ -349,9 +357,6 @@ export function Reader() {
 
   /* ---- explicit reader phase (product-facing state machine) ---- */
   const firstReady = prepared >= 1 || playerState !== "idle";
-  // Playable = chunks exist and the document is ready (or preparing).  This
-  // lets the user click Play while audio is being prepared — the intent is
-  // queued and auto-starts when chunk 0 is ready.
   const playable = totalChunks > 0 && rawPhase === "ready";
   const phase = deriveReaderPhase(
     rawPhase,
@@ -365,17 +370,6 @@ export function Reader() {
 
   /* ---- progress / percentage helpers ---- */
   const prepPct = totalChunks > 0 ? Math.round((prepared / totalChunks) * 100) : 0;
-  const playbackPct =
-    playerState === "ended"
-      ? 100
-      : totalChunks > 0
-        ? Math.round(
-            ((chunkIndex +
-              (playerState === "playing" || playerState === "paused" ? 1 : 0)) /
-              totalChunks) *
-              100,
-          )
-        : 0;
   const exportPct = exportProgress
     ? Math.round((exportProgress.done / exportProgress.total) * 100)
     : 0;
@@ -403,7 +397,6 @@ export function Reader() {
 
   /* ---- label / state text ---- */
   const stateLabel = PHASE_LABELS[phase];
-  // During preparation with progress available, show a percentage.
   const statusText =
     phase === "preparing" && firstReady
       ? `Preparando audio · ${prepPct} %`
@@ -413,7 +406,12 @@ export function Reader() {
           : "Audio listo"
         : stateLabel;
 
-  const barPct = exporting ? exportPct : playerState === "idle" ? prepPct : playbackPct;
+  const barPct = exporting ? exportPct : playerState === "idle" ? prepPct : 0;
+
+  // Determine if we're in a buffering state (mid-document)
+  const isBuffering = playerState === "buffering" || playerState === "loading";
+  const isInitialBuffer =
+    playerState === "loading" || (playerState === "buffering" && currentTime === 0);
 
   const playLabel = exporting
     ? "Descargando…"
@@ -442,11 +440,13 @@ export function Reader() {
       {/* ——— Header ——— */}
       <header className="reader-header">
         <div>
-          <h1>Lector de documentos</h1>
-          <p className="reader-tag">Convierte documentos PDF en audio para escuchar</p>
+          <h1>
+            <span className="brand-icon">📖</span> DocuVoz
+          </h1>
+          <p className="reader-tag">Escucha tus documentos de forma natural</p>
         </div>
         <Link href="/lab" className="reader-lablink">
-          Lab
+          Laboratorio
         </Link>
       </header>
 
@@ -477,8 +477,7 @@ export function Reader() {
             Seleccionar PDF
           </button>
           <p className="reader-hero-hint">
-            El documento se procesa solo en tu navegador · máximo 25 MB · no se sube nada
-            a internet
+            Procesado local en tu navegador · máximo 25 MB · no se sube nada a internet
           </p>
           {corpus && corpus.entries.length > 0 && (
             <div className="reader-examples">
@@ -523,7 +522,7 @@ export function Reader() {
       {/* ——— Loaded-document state ——— */}
       {phase !== "empty" && phase !== "loading" && phase !== "extracting" && plan && (
         <>
-          {/* Document header */}
+          {/* Document meta bar */}
           <article className="reader-doc">
             <div>
               <h2 className="reader-doc-name" title={doc?.source.name}>
@@ -531,8 +530,10 @@ export function Reader() {
               </h2>
               <p className="reader-doc-meta">
                 {doc?.source.pageCount != null && <>{doc.source.pageCount} páginas · </>}≈{" "}
-                {Math.max(1, Math.round(totalChars / CHARS_PER_MINUTE))} min de audio ·{" "}
-                {effLang === "en" ? "English" : "Español"}
+                {Math.max(1, Math.round(totalChars / CHARS_PER_MINUTE))} min ·{" "}
+                {effLang === "en" ? "English" : "Español"} ·{" "}
+                {voices.find((v) => v.id === activeVoice)?.label.split("—")[0] ??
+                  activeVoice}
               </p>
             </div>
             <button
@@ -545,9 +546,9 @@ export function Reader() {
             </button>
           </article>
 
-          {/* Settings grid */}
+          {/* Settings */}
           <section className="reader-settings" aria-label="ajustes de reproducción">
-            <label>
+            <label className="setting-main">
               <span>Idioma</span>
               <select
                 aria-label="idioma"
@@ -555,55 +556,28 @@ export function Reader() {
                 onChange={(e) => setLangChoice(e.target.value as "auto" | Lang)}
               >
                 <option value="auto">
-                  Automático ({effLang === "en" ? "English" : "Español"})
+                  {langChoice === "auto"
+                    ? `Auto (${effLang === "en" ? "English" : "Español"})`
+                    : langChoice === "es"
+                      ? "Español"
+                      : "English"}
                 </option>
                 <option value="es">Español</option>
                 <option value="en">English</option>
               </select>
             </label>
-            {availableEngines.length > 1 && (
-              <label>
-                <span>Motor</span>
-                <select
-                  aria-label="motor de voz"
-                  value={engineChoice}
-                  onChange={(e) => setEngineChoice(e.target.value as EngineChoice)}
-                >
-                  <option value="auto">Automático</option>
-                  {engines.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {ENGINES[e.id as EngineId]?.label ?? e.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label>
-              <span>Voz</span>
-              <select
-                aria-label="voz"
-                value={activeVoice}
-                onChange={(e) => setVoice(e.target.value)}
-              >
-                {voices.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
+            <label className="setting-main">
               <span>Modo</span>
               <select
                 aria-label="modo de lectura"
                 value={mode}
                 onChange={(e) => setMode(e.target.value as SpokenMode)}
               >
-                <option value="listen">Listen — optimizado para escuchar</option>
-                <option value="literal">Literal — texto original</option>
+                <option value="listen">Listen</option>
+                <option value="literal">Literal</option>
               </select>
             </label>
-            <label>
+            <label className="setting-main">
               <span>Velocidad</span>
               <select
                 aria-label="velocidad de reproducción"
@@ -617,6 +591,51 @@ export function Reader() {
                 ))}
               </select>
             </label>
+
+            {/* Advanced: engine + voice */}
+            <div className="reader-settings-expand">
+              <button
+                type="button"
+                className="reader-settings-toggle"
+                onClick={() => setAdvanced((a) => !a)}
+                aria-expanded={advanced}
+              >
+                {advanced ? "▲ Opciones avanzadas" : "▼ Opciones avanzadas"}
+              </button>
+              {advanced && (
+                <div className="reader-settings-advanced">
+                  <label>
+                    <span>Motor</span>
+                    <select
+                      aria-label="motor de voz"
+                      value={engineChoice}
+                      onChange={(e) => setEngineChoice(e.target.value as EngineChoice)}
+                    >
+                      <option value="auto">Automático</option>
+                      {engines.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {ENGINES[e.id as EngineId]?.label ?? e.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Voz</span>
+                    <select
+                      aria-label="voz"
+                      value={activeVoice}
+                      onChange={(e) => setVoice(e.target.value)}
+                    >
+                      {voices.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
           </section>
 
           {/* Primary play area */}
@@ -674,6 +693,19 @@ export function Reader() {
         </>
       )}
 
+      {/* ——— Non-blocking export progress (small bar) ——— */}
+      {exporting && (
+        <div className="reader-export-bar" aria-label="exportación en progreso">
+          <div className="reader-export-fill" style={{ width: `${exportPct}%` }} />
+          <span className="reader-export-label">
+            {exportProgress ? `${exportProgress.done}/${exportProgress.total}` : ""}
+          </span>
+          <button type="button" className="reader-export-cancel" onClick={cancelExport}>
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* ——— Sticky transport bar ——— */}
       {playable && (
         <div className="reader-transport" aria-label="reproductor">
@@ -709,16 +741,37 @@ export function Reader() {
           >
             ⏭
           </button>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(0.01, duration)}
+            value={currentTime}
+            disabled={!firstReady || playerState === "buffering"}
+            onChange={(e) => playerRef.current?.seekByTime(Number(e.target.value))}
+            aria-label="barra de progreso"
+            className="reader-seek-bar"
+          />
+          <span className="reader-transport-time" aria-label="tiempo">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
           <span className="reader-transport-rate" aria-label="velocidad">
             {rate}×
           </span>
+          {isBuffering && (
+            <span
+              className="reader-buffering"
+              aria-label="preparando siguiente fragmento"
+            >
+              {isInitialBuffer ? "Preparando…" : "…"}
+            </span>
+          )}
           <button
             type="button"
             className="reader-download"
             aria-label={exporting ? "cancelar descarga" : "descargar audio"}
             onClick={() => (exporting ? cancelExport() : void runExport())}
           >
-            {exporting ? `⏹ Cancelar (${exportPct} %)` : "⬇ Audio"}
+            {exporting ? "Cancelando…" : "⬇ Audio"}
           </button>
         </div>
       )}

@@ -15,7 +15,7 @@ import fs from "node:fs";
 
 async function loadFixture(page: Page, title: string) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Lector de documentos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "DocuVoz" })).toBeVisible();
   await page.getByRole("button", { name: title, exact: true }).click();
   const play = page.getByRole("button", { name: /Escuchar/ });
   await expect(play).toBeVisible();
@@ -197,11 +197,13 @@ test("document switching during preparation does not ghost old audio", async ({
 test("changing voice is safe (no stale cache references)", async ({ page }) => {
   await loadFixture(page, "Documento simple");
 
-  // Check the voice selector is present and functional.
-  const voiceSelect = page.getByRole("combobox", { name: "voz" });
-  await expect(voiceSelect).toBeVisible();
+  // The voice selector is under "Opciones avanzadas".
+  await page.getByRole("button", { name: "Opciones avanzadas" }).click();
+  const voiceLabel = page.getByLabel("voz", { exact: true });
+  await expect(voiceLabel).toBeVisible();
 
   // Select a different voice.
+  const voiceSelect = voiceLabel;
   const options = await voiceSelect.evaluateAll((els) =>
     els.map((el) => (el as HTMLSelectElement).options),
   );
@@ -217,9 +219,63 @@ test("changing voice is safe (no stale cache references)", async ({ page }) => {
 
 test("/lab is reachable from the reader and functional", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Lector de documentos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "DocuVoz" })).toBeVisible();
 
   // Click the Lab link.
-  await page.getByRole("link", { name: "Lab" }).click();
+  await page.getByRole("link", { name: "Laboratorio" }).click();
   await expect(page.getByRole("heading", { level: 1, name: /AUIDIO NAN/ })).toBeVisible();
+});
+
+/* ------------------------------------------------------------------ */
+/*  AbortError regression test: capture page errors during doc switch  */
+/* ------------------------------------------------------------------ */
+
+test("document switching does not produce AbortError in the browser", async ({
+  page,
+}) => {
+  // Capture all browser console errors / unhandled rejections
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      errors.push(msg.text());
+    }
+  });
+  page.on("pageerror", (err) => {
+    errors.push(err.message);
+  });
+
+  // Load a fixture — triggers document loading and player preparation.
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Circular ficticia 1/2024", exact: true })
+    .click();
+
+  // Let the first document's player start preparing.
+  await expect(page.getByRole("button", { name: /Escuchar/ })).toBeVisible();
+
+  // Immediately load a second document via file input.
+  // This triggers beginLoad() -> destroy() -> new player creation.
+  const pdf = await page.request.get("/corpus/pdfs/simple-01.pdf");
+  const body = await pdf.body();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "simple-01.pdf",
+    mimeType: "application/pdf",
+    buffer: body,
+  });
+
+  // Wait for the second document to load.
+  await expect(page.getByRole("heading", { name: "simple-01.pdf" })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  // The second document should be playable (not stuck in error state).
+  const play = page.getByRole("button", { name: /Escuchar/ });
+  await expect(play).toBeVisible();
+  await expect(play).toBeEnabled();
+
+  // Verify no AbortError leaked into the browser console.
+  const abortErrors = errors.filter(
+    (e) => e.includes("AbortError") || e.includes("signal is aborted"),
+  );
+  expect(abortErrors).toHaveLength(0);
 });

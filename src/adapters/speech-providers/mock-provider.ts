@@ -16,6 +16,18 @@ import {
 
 export class MockSpeechProvider implements SpeechProvider {
   readonly name = "mock";
+
+  getMetadata() {
+    return {
+      name: "mock",
+      capabilities: {
+        supportsWordBoundaries: false,
+        supportsStreaming: false,
+        supportsExactDuration: true,
+      },
+    };
+  }
+
   private counter = 0;
 
   constructor(

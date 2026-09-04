@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AUIDIO NAN — document-to-audio reading laboratory",
+  title: "DocuVoz — Escucha tus documentos",
   description:
-    "Phase 0 prototype: turning Spanish financial and regulatory documents into speech optimized for listening. Literal vs deterministic Listen vs Manual Gold.",
+    "Convierte documentos PDF a audio natural. Lee en cualquier momento con voz realista.",
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body>{children}</body>
     </html>
   );

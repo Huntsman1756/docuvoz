@@ -146,7 +146,7 @@ export async function handleSpeech(
       },
       "speech served from cache",
     );
-    return audio(cached.audio, cached.mimeType, key, "HIT", started);
+    return audio(cached.audio, cached.mimeType, key, "HIT", started, cached.boundaries);
   }
 
   if (signal?.aborted) {
@@ -193,7 +193,7 @@ export async function handleSpeech(
       },
       "speech generated",
     );
-    return audio(result.audio, result.mimeType, key, "MISS", started);
+    return audio(result.audio, result.mimeType, key, "MISS", started, result.boundaries);
   } catch (error) {
     // Client cancellation (seek / document switch / aborted prefetch) is
     // normal traffic, not a provider incident: log it as cancelled.
@@ -240,16 +240,25 @@ function audio(
   key: string,
   cacheStatus: "HIT" | "MISS",
   started: number,
+  boundaries?: import("@/domain/speech/types").WordBoundary[],
 ): HandlerResponse {
+  const headers: Record<string, string> = {
+    "content-type": mimeType,
+    "cache-key": key,
+    "cache-status": cacheStatus,
+    "request-duration-ms": String(Date.now() - started),
+    "cache-control": "private, max-age=86400",
+  };
+  // Include word boundaries in a response header (base64-encoded JSON).
+  // Clients that don't understand this header can safely ignore it.
+  if (boundaries && boundaries.length > 0) {
+    headers["x-word-boundaries"] = Buffer.from(JSON.stringify(boundaries)).toString(
+      "base64",
+    );
+  }
   return {
     status: 200,
-    headers: {
-      "content-type": mimeType,
-      "cache-key": key,
-      "cache-status": cacheStatus,
-      "request-duration-ms": String(Date.now() - started),
-      "cache-control": "private, max-age=86400",
-    },
+    headers,
     audio: bytes,
   };
 }

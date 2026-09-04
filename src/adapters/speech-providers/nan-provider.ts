@@ -25,6 +25,17 @@ export interface NanProviderOptions {
 export class NanSpeechProvider implements SpeechProvider {
   readonly name = "nan";
 
+  getMetadata() {
+    return {
+      name: "nan",
+      capabilities: {
+        supportsWordBoundaries: false,
+        supportsStreaming: false,
+        supportsExactDuration: true,
+      },
+    };
+  }
+
   constructor(private readonly options: NanProviderOptions) {}
 
   async synthesize(request: SpeechRequest): Promise<SpeechResult> {

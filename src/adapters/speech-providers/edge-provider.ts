@@ -6,6 +6,11 @@
  * Treat it as an optional edge path: when it is not configured or the
  * endpoint misbehaves, the standard engine (NaN/Kokoro) covers everything.
  *
+ * Word boundaries are enabled when the library supports them (v2.0.7+).
+ * Metadata arrives on a separate Readable stream alongside the audio stream.
+ * Boundary timing uses 100-nanosecond ticks (Edge wire format) and is
+ * converted to seconds at the provider boundary.
+ *
  * Security notes (this endpoint takes untrusted document text):
  * - `toStream()` interpolates text into an SSML template WITHOUT escaping,
  *   so we XML-escape all text here — document content can contain `<`, `>`,
@@ -20,6 +25,7 @@ import {
   type SpeechProvider,
   type SpeechRequest,
   type SpeechResult,
+  type WordBoundary,
 } from "@/domain/speech/types";
 
 export const EDGE_VOICE_PATTERN = /^[a-z]{2}-[A-Z]{2}-[A-Za-z0-9]+Neural$/;
@@ -32,6 +38,11 @@ export function escapeSsmlText(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Convert Edge 100-nanosecond ticks to seconds. */
+function ticksToSeconds(ticks: number): number {
+  return ticks / 10_000_000;
+}
+
 export interface EdgeProviderOptions {
   /** Abort synthesis after this many ms. */
   timeoutMs: number;
@@ -41,6 +52,19 @@ export interface EdgeProviderOptions {
 
 export class EdgeSpeechProvider implements SpeechProvider {
   readonly name = "edge";
+
+  /** Edge TTS provides word boundary information via metadata stream. */
+  getMetadata() {
+    return {
+      name: "edge",
+      capabilities: {
+        supportsWordBoundaries: true,
+        supportsStreaming: true,
+        supportsExactDuration: true,
+      },
+    };
+  }
+
   /** One MsEdgeTTS instance per voice; the library reconnects on setMetadata,
    * so instances are created lazily and reused for sequential requests. */
   private clients = new Map<string, Promise<MsEdgeTTS>>();
@@ -52,7 +76,10 @@ export class EdgeSpeechProvider implements SpeechProvider {
     if (existing) return existing;
     const created = (async () => {
       const client = new MsEdgeTTS({ enableLogger: false });
-      await client.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+      // Enable word boundary metadata so metadataStream is available
+      await client.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3, {
+        wordBoundaryEnabled: true,
+      });
       return client;
     })();
     this.clients.set(voice, created);
@@ -92,8 +119,44 @@ export class EdgeSpeechProvider implements SpeechProvider {
       });
     }
     const started = Date.now();
-    const { audioStream } = client.toStream(escapeSsmlText(request.text));
+    const { audioStream, metadataStream } = client.toStream(escapeSsmlText(request.text));
     const chunks: Buffer[] = [];
+    const boundaries: WordBoundary[] = [];
+
+    // Collect metadata events (word boundaries) concurrently with audio.
+    // Metadata failure must not make working TTS fail.
+    if (metadataStream) {
+      metadataStream.on("data", (chunk: Buffer) => {
+        try {
+          const parsed = JSON.parse(chunk.toString()) as {
+            Metadata?: Array<{
+              Type: string;
+              Data: {
+                Offset: number;
+                Duration: number;
+                text: { Text: string; BoundaryType: string };
+              };
+            }>;
+          };
+          if (parsed.Metadata) {
+            for (const item of parsed.Metadata) {
+              if (item.Type === "WordBoundary" && item.Data) {
+                boundaries.push({
+                  text: item.Data.text.Text,
+                  offsetSeconds: ticksToSeconds(item.Data.Offset),
+                  durationSeconds: ticksToSeconds(item.Data.Duration),
+                });
+              }
+            }
+          }
+        } catch {
+          // Tolerate malformed metadata — audio is unaffected
+        }
+      });
+      // Let metadata errors pass silently — audio is the priority
+      metadataStream.on("error", () => {});
+    }
+
     try {
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -146,6 +209,7 @@ export class EdgeSpeechProvider implements SpeechProvider {
       audio,
       mimeType: "audio/mpeg",
       providerDurationMs: Date.now() - started,
+      boundaries: boundaries.length > 0 ? boundaries : undefined,
     };
   }
 

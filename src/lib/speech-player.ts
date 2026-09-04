@@ -23,6 +23,14 @@ import type { SpeechSettings } from "@/domain/speech/types";
 import { computeAudioCacheKey } from "@/infrastructure/cache/cache-key";
 import { getCachedAudio, putCachedAudio } from "./idb-audio-cache";
 
+/** Classify intentional cancellation (destroy/abort) vs real failures. */
+export function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
 export type PlayerState = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 
 export interface PlayerMetrics {
@@ -42,6 +50,8 @@ export interface PlayerEvents {
   onError(code: string): void;
   /** Background preparation progress: `ready` consecutive chunks fetched. */
   onPreparedChange?(ready: number, total: number): void;
+  /** Playback time (s) for the transport bar (optional). */
+  onTimeUpdate?: (position: number, duration: number) => void;
 }
 
 export interface EngineDescriptor {
@@ -78,6 +88,8 @@ export interface PlayerOptions {
   fetchImpl?: typeof fetch;
   /** Server runtime defaults (from /api/health). */
   health?: () => Promise<HealthDescriptor>;
+  /** Timeout for individual fetch requests (ms). */
+  fetchTimeoutMs?: number;
 }
 
 export class SpeechPlayer {
@@ -211,7 +223,9 @@ export class SpeechPlayer {
 
   resume(): void {
     if (this.state === "paused" && this.audio) {
-      void this.audio.play();
+      void this.audio.play().catch(() => {
+        /* autoplay blocked — next play() click will retry */
+      });
       this.setState("playing");
     }
   }
@@ -219,21 +233,25 @@ export class SpeechPlayer {
   /** Stop playback; in-flight generation continues (cached for reuse). */
   stop(): void {
     this.epoch += 1;
-    this.audio?.pause();
+    try {
+      this.audio?.pause();
+    } catch {
+      /* audio pause failures are non-fatal */
+    }
     this.audio = null;
     this.releaseUrls();
     this.setState("idle");
   }
 
   /** Tear the instance down (document switch / unmount): aborts every
-   * in-flight fetch and silences audio immediately. */
+   * in-flight fetch and silences audio immediately. Idempotent. */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.prepareEpoch += 1;
     this.prepareLoopActive = false;
     this.stop();
-    this.instanceAbort.abort();
+    this.instanceAbort.abort(new DOMException("SpeechPlayer destroyed", "AbortError"));
     this.blobs.clear();
   }
 
@@ -268,8 +286,9 @@ export class SpeechPlayer {
       if (this.destroyed || epoch !== this.prepareEpoch) return;
       try {
         await this.ensureBlob(this.chunks[i]);
-      } catch {
+      } catch (error) {
         if (!this.destroyed && epoch === this.prepareEpoch) {
+          if (isAbortError(error)) return;
           this.prepareLoopActive = false;
           this.events.onError("prepare_failed");
         }
@@ -296,6 +315,7 @@ export class SpeechPlayer {
       blob = await this.ensureBlob(chunk);
     } catch (error) {
       if (epoch !== this.epoch || this.destroyed) return;
+      if (isAbortError(error)) return;
       this.metrics.errors += 1;
       this.emitMetrics();
       this.setState("error");
@@ -323,6 +343,13 @@ export class SpeechPlayer {
     this.events.onChunkChange(index);
     this.setState("playing");
 
+    // Track playback time for the transport bar.
+    const el = this.audio;
+    const onTimeUpdate = () => {
+      if (el) this.events.onTimeUpdate?.(el.currentTime, el.duration || 0);
+    };
+    el.addEventListener("timeupdate", onTimeUpdate);
+
     const finished = await new Promise<"ended" | "error" | "cancelled">((resolve) => {
       const audio = this.audio;
       if (!audio) return resolve("cancelled");
@@ -333,6 +360,9 @@ export class SpeechPlayer {
       // e2e suite). A rejected play() (autoplay policy) surfaces as error.
       audio.play().catch(() => resolve("error"));
     });
+
+    // Clean up timeupdate listener on the original element.
+    el.removeEventListener("timeupdate", onTimeUpdate);
     if (epoch !== this.epoch || this.destroyed) return;
     if (finished === "error") {
       this.metrics.errors += 1;
@@ -352,6 +382,7 @@ export class SpeechPlayer {
       const chunk = this.chunks[index + d];
       if (!chunk) return;
       void this.ensureBlob(chunk).catch((error: unknown) => {
+        if (isAbortError(error)) return;
         if (epoch === this.epoch && !this.destroyed) {
           this.metrics.errors += 1;
           this.emitMetrics();
@@ -444,7 +475,9 @@ export class SpeechPlayer {
     this.metrics.requests += 1;
     this.metrics.requestLatenciesMs.push(Date.now() - started);
     this.emitMetrics();
-    void putCachedAudio(serverKey, blob);
+    void putCachedAudio(serverKey, blob).catch(() => {
+      /* cache writes must never break playback */
+    });
     return blob;
   }
 

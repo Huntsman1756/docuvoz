@@ -36,8 +36,13 @@ export class FileAudioCache {
     try {
       const meta = JSON.parse(readFileSync(metaPath, "utf8")) as {
         mimeType: string;
+        boundaries?: import("@/domain/speech/types").WordBoundary[];
       };
-      return { audio: new Uint8Array(readFileSync(path)), mimeType: meta.mimeType };
+      return {
+        audio: new Uint8Array(readFileSync(path)),
+        mimeType: meta.mimeType,
+        boundaries: meta.boundaries,
+      };
     } catch {
       return null;
     }
@@ -48,7 +53,10 @@ export class FileAudioCache {
     writeFileSync(this.pathFor(key), result.audio);
     writeFileSync(
       `${this.pathFor(key)}.meta.json`,
-      JSON.stringify({ mimeType: result.mimeType }),
+      JSON.stringify({
+        mimeType: result.mimeType,
+        boundaries: result.boundaries,
+      }),
     );
     this.enforceLimit();
   }
