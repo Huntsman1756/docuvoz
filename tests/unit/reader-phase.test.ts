@@ -107,6 +107,12 @@ describe("deriveReaderPhase", () => {
     );
   });
 
+  it("returns ready when the player has ended (ready to replay)", () => {
+    expect(deriveReaderPhase("ready", "ended", false, true, false, false, null)).toBe(
+      "ready",
+    );
+  });
+
   /* ---- exporting state ---- */
   it("returns exporting during WAV download", () => {
     expect(deriveReaderPhase("ready", "playing", false, true, false, true, null)).toBe(

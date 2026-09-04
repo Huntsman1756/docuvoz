@@ -60,6 +60,7 @@ export function deriveReaderPhase(
   if (rawPhase === "loading") return "loading";
   if (rawPhase === "extracting") return "extracting";
   if (playerState === "playing") return "playing";
+  if (playerState === "ended") return "ready";
   if (playerState === "paused") return "paused";
   if (playerState === "error") return "error";
   // While chunks are still being prepared, keep showing "preparing"
