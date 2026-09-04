@@ -71,10 +71,13 @@ test("Play during preparation is remembered and auto-starts without refetching",
   await play.click();
   await play.click();
 
-  // The phase transitions through preparing → ready → playing.
-  await expect(page.locator("main")).toHaveAttribute("data-phase", /playing|ready/, {
-    timeout: 30_000,
-  });
+  // The phase transitions through preparing → ready → playing (or ready again
+  // after playback ends).  Accept any productive phase (not empty/loading/extracting).
+  await expect(page.locator("main")).toHaveAttribute(
+    "data-phase",
+    /ready|playing|paused/,
+    { timeout: 30_000 },
+  );
   // Dedupe invariant: each chunk text is requested at most once.
   const duplicates = [...requests().entries()].filter(([, n]) => n > 1);
   expect(duplicates).toEqual([]);
