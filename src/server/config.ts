@@ -3,7 +3,7 @@
  * src/instrumentation.ts). Fail-fast with a clear message; never print secrets.
  *
  * The runtime exposes an ENGINE REGISTRY (Personal Reader v0.3): engine id 0
- * is the default (NaN/Kokoro or mock), and optional premium engines (Edge TTS
+ * is the default (NaN/Kokoro or mock), and optional free engines (Edge TTS
  * neural voices) can be enabled per deployment. The browser picks an engine
  * by opaque id — internal provider names stay in /lab and the logs.
  */
@@ -124,8 +124,8 @@ export function createEngines(config: ServerConfig): EngineRuntime[] {
   }
   if (config.EDGE_TTS_ENABLED) {
     engines.push({
-      id: "premium",
-      label: "Premium",
+      id: "edge",
+      label: "Edge TTS",
       provider: pace(
         config,
         new EdgeSpeechProvider({ timeoutMs: config.SPEECH_TIMEOUT_MS }),

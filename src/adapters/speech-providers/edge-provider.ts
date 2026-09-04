@@ -3,7 +3,7 @@
  *
  * Uses Microsoft Edge's free neural voices (es-ES-*, es-MX-*, en-US-* ...)
  * through the unofficial endpoint implemented by `msedge-tts`. No API key.
- * Treat it as an optional premium path: when it is not configured or the
+ * Treat it as an optional edge path: when it is not configured or the
  * endpoint misbehaves, the standard engine (NaN/Kokoro) covers everything.
  *
  * Security notes (this endpoint takes untrusted document text):

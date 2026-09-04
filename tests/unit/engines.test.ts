@@ -49,11 +49,11 @@ describe("createEngines", () => {
       SPEECH_PROVIDER: "mock",
       EDGE_TTS_ENABLED: "1",
     });
-    expect(createEngines(withEdge).map((e) => e.id)).toEqual(["default", "premium"]);
-    // labels must be brand-free (product surface shows them)
-    for (const e of createEngines(withEdge)) {
-      expect(e.label).not.toMatch(/kokoro|nan|edge|ms/i);
-    }
+    expect(createEngines(withEdge).map((e) => e.id)).toEqual(["default", "edge"]);
+    // labels must not leak underlying provider brands (Edge TTS is a first-class
+    // engine, so "Edge" is the product-facing name, not a hidden provider tag).
+    expect(createEngines(withEdge)[0].label).not.toMatch(/kokoro|nan/i);
+    expect(createEngines(withEdge)[1].label).toBe("Edge TTS");
   });
   it("treats '0'/'false'/blank as disabled (coerce.boolean trap)", () => {
     for (const value of ["0", "false", ""]) {
@@ -105,18 +105,18 @@ describe("engine resolution in the handler", () => {
 
   it("a different engine produces a different cache key for the same text", async () => {
     const engines = createEngines(loadConfig({ SPEECH_PROVIDER: "mock" }));
-    const premium: EngineRuntime = {
+    const edge: EngineRuntime = {
       ...engines[0],
-      id: "premium",
+      id: "edge",
       provider: {
         name: "othermock",
         synthesize: (req) => engines[0].provider.synthesize(req),
       },
       model: "other-1",
     };
-    const d = depsWith([...engines, premium]);
+    const d = depsWith([...engines, edge]);
     const a = await handleSpeech({ text: "mismo texto" }, "c", d);
-    const b = await handleSpeech({ text: "mismo texto", engine: "premium" }, "c", d);
+    const b = await handleSpeech({ text: "mismo texto", engine: "edge" }, "c", d);
     expect(a.headers["cache-key"]).not.toBe(b.headers["cache-key"]);
   });
 
@@ -124,7 +124,7 @@ describe("engine resolution in the handler", () => {
     const engines = createEngines(loadConfig({ SPEECH_PROVIDER: "mock" }));
     const edgeRuntime: EngineRuntime = {
       ...engines[0],
-      id: "premium",
+      id: "edge",
       provider: {
         name: "edge",
         synthesize: async (req) => ({
@@ -136,7 +136,7 @@ describe("engine resolution in the handler", () => {
     };
     const d = depsWith([...engines, edgeRuntime]);
     const evil = await handleSpeech(
-      { text: "x", engine: "premium", voice: 'a" evil><speak>' },
+      { text: "x", engine: "edge", voice: 'a" evil><speak>' },
       "c",
       d,
     );

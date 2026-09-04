@@ -4,17 +4,17 @@
  * Engines are addressed by opaque id (server engine registry):
  *   "default" — the standard engine configured on the server
  *               (Kokoro via NaN in real deployments);
- *   "premium" — Microsoft Edge neural voices (free, no key, notably better
- *               Spanish prosody). Present only when the server enables it;
- *               the UI hides the engine picker otherwise.
- * "auto" resolves per language: es prefers premium when available, en stays
+ *   "edge" — Microsoft Edge neural voices (free, no key, notably better
+ *            Spanish prosody). Present only when the server enables it;
+ *            the UI hides the engine picker otherwise.
+ * "auto" resolves per language: es prefers edge when available, en stays
  * on the standard engine (Kokoro's English voices are already good).
  *
  * Selecting a voice/engine only changes fields sent to /api/speech; the
  * provider override + content-addressed caches handle the rest.
  */
 export type Lang = "es" | "en";
-export type EngineId = "default" | "premium";
+export type EngineId = "default" | "edge";
 export type EngineChoice = "auto" | EngineId;
 
 export interface VoiceOption {
@@ -35,10 +35,10 @@ export const ENGINES: Record<EngineId, EngineInfo> = {
     label: "Estándar",
     description: "Buena en español e inglés",
   },
-  premium: {
-    id: "premium",
-    label: "Premium",
-    description: "Voces neuronales, mejor español",
+  edge: {
+    id: "edge",
+    label: "Edge TTS",
+    description: "Voces neuronales de Microsoft, gratis",
   },
 };
 
@@ -55,7 +55,7 @@ const KOKORO_VOICES: Record<Lang, VoiceOption[]> = {
   ],
 };
 
-const PREMIUM_VOICES: Record<Lang, VoiceOption[]> = {
+const EDGE_VOICES: Record<Lang, VoiceOption[]> = {
   es: [
     { id: "es-ES-XimenaNeural", label: "Ximena — mujer (España)" },
     { id: "es-ES-AlvaroNeural", label: "Álvaro — hombre (España)" },
@@ -72,7 +72,7 @@ const PREMIUM_VOICES: Record<Lang, VoiceOption[]> = {
 
 /** Voices the server engine accepts; keep in sync with its allowlist. */
 export function voicesFor(lang: Lang, engine: EngineId = "default"): VoiceOption[] {
-  return (engine === "premium" ? PREMIUM_VOICES : KOKORO_VOICES)[lang];
+  return (engine === "edge" ? EDGE_VOICES : KOKORO_VOICES)[lang];
 }
 
 export function defaultVoice(lang: Lang, engine: EngineId = "default"): string {
@@ -81,7 +81,7 @@ export function defaultVoice(lang: Lang, engine: EngineId = "default"): string {
 
 /**
  * Resolve "auto" to a concrete engine given what the server actually has
- * enabled. Premium wins for Spanish only (its advantage); English stays on
+ * enabled. edge wins for Spanish only (its advantage); English stays on
  * the standard engine.
  */
 export function resolveEngine(
@@ -90,7 +90,7 @@ export function resolveEngine(
   available: EngineId[],
 ): EngineId {
   if (choice !== "auto" && available.includes(choice)) return choice;
-  if (lang === "es" && available.includes("premium")) return "premium";
+  if (lang === "es" && available.includes("edge")) return "edge";
   return "default";
 }
 

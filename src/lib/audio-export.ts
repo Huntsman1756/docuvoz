@@ -8,7 +8,7 @@
  * in-flight generation alive and cached.
  *
  * Chunks are decoded through WebAudio (so any provider container — PCM WAV,
- * MP3 from the premium engine, ... — works), then resampled to a common rate
+ * MP3 from the edge engine, ... — works), then resampled to a common rate
  * and encoded once as a 16-bit PCM WAV.
  */
 

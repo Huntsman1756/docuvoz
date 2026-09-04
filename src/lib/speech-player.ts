@@ -45,7 +45,7 @@ export interface PlayerEvents {
 }
 
 export interface EngineDescriptor {
-  /** Client-facing engine id ("default", "premium", ...). */
+  /** Client-facing engine id ("default", "edge", ...). */
   id: string;
   label: string;
   /** Server-side identity used in the cache key when this engine is picked. */
