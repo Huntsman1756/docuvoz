@@ -161,3 +161,51 @@ export function getServerRuntime(): {
   }
   return cached;
 }
+
+/**
+ * F07 — Operation-deadline model.
+ *
+ * One coherent deadline governs the entire synthesis operation. Within it,
+ * phase-specific caps ensure no single phase can starve the others.
+ *
+ * The relationship is: TOTAL >= QUEUE + CONNECT + FIRST_BYTE + margin.
+ * If TOTAL fires, the whole operation is cancelled regardless of phase.
+ *
+ * These are NOT arbitrary stacked timers — they are nested budgets within
+ * a single operation deadline. AbortSignal.timeout or AbortSignal.any
+ * compose them cleanly.
+ *
+ * Rationale (2026-09):
+ * - Queue: 5s. A provider under load should not hold a request for more
+ *   than 5s. The pacing layer already enforces min-interval; this bounds
+ *   the wait.
+ * - Connect: 10s. WebSocket (Edge) or TCP handshake (NaN) should complete
+ *   in under 10s. Anything longer indicates a network or provider issue.
+ * - First byte: 15s. After connection, the first audio byte should arrive
+ *   within 15s. Longer means the provider is stuck or overloaded.
+ * - Total: 60s. Hard ceiling. Covers queue + connect + synthesis + stream.
+ *   Derived from SPEECH_TIMEOUT_MS (30s default) plus headroom for
+ *   paced retries. Prevents zombie operations.
+ */
+export const DEADLINE = {
+  /** Maximum time a request waits in the pacing queue. */
+  QUEUE_MS: 5_000,
+  /** Maximum time for connection/setup (WebSocket connect, TCP handshake). */
+  CONNECT_MS: 10_000,
+  /** Maximum time from connection to first audio byte. */
+  FIRST_BYTE_MS: 15_000,
+  /** Hard ceiling for the entire synthesis operation (queue through stream end). */
+  TOTAL_MS: 60_000,
+} as const;
+
+/**
+ * Phase classification for structured diagnostics.
+ * Each speech operation records which phase it was in when it failed.
+ */
+export type SpeechPhase = "queue" | "connect" | "setup" | "first_byte" | "stream";
+
+/**
+ * Outcome classification for structured diagnostics.
+ */
+export type SpeechOutcome =
+  "success" | "cancelled" | "timeout" | "provider_error" | "queue_rejected" | "cache_hit";

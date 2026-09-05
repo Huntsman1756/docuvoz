@@ -6,7 +6,9 @@
  * - input validated with zod; text length capped; body size capped;
  * - provider pacing/retries handled inside the provider wrapper;
  * - responses never contain stack traces, provider keys or provider error
- *   bodies — only stable error codes.
+ *   bodies — only stable error codes;
+ * - structured diagnostics record provider, outcome, phase, and duration
+ *   without leaking document text or API keys.
  */
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -15,7 +17,7 @@ import { isValidEdgeVoice } from "@/adapters/speech-providers/edge-provider";
 import { computeAudioCacheKey } from "@/infrastructure/cache/cache-key";
 import { FileAudioCache } from "@/infrastructure/cache/file-audio-cache";
 import { contentFingerprint, type Logger } from "@/infrastructure/logging/logger";
-import type { EngineRuntime, ServerConfig } from "../config";
+import type { EngineRuntime, ServerConfig, SpeechOutcome, SpeechPhase } from "../config";
 import { SlidingWindowRateLimiter } from "../rate-limit";
 
 export const SpeechRequestSchema = z.object({
@@ -99,6 +101,14 @@ export async function handleSpeech(
   }
   const retryAfter = deps.limiter.check(clientKey);
   if (retryAfter !== null) {
+    deps.logger.info(
+      {
+        event: "speech",
+        outcome: "queue_rejected",
+        ms: Date.now() - started,
+      },
+      "speech request rate-limited",
+    );
     return json(
       429,
       { error: "rate_limited" },
@@ -141,6 +151,7 @@ export async function handleSpeech(
       {
         event: "speech",
         outcome: "cache_hit",
+        provider: settings.provider,
         key: key.slice(0, 12),
         ms: Date.now() - started,
       },
@@ -166,13 +177,28 @@ export async function handleSpeech(
     const result = await engine.provider.synthesize({ text, settings, signal });
     // The audio is content-addressed and valid even if the caller aborted:
     // cache it anyway so a subsequent request hits.
-    deps.cache.set(key, result);
+    try {
+      deps.cache.set(key, result);
+    } catch {
+      // Cache write failure must NOT turn a successful synthesis into a
+      // user-visible error. Log and continue.
+      deps.logger.warn(
+        {
+          event: "speech",
+          outcome: "cache_write_failed",
+          provider: settings.provider,
+          key: key.slice(0, 12),
+        },
+        "failed to write audio to server cache (synthesis still valid)",
+      );
+    }
     if (signal?.aborted) {
       deps.logger.info(
         {
           event: "speech",
           outcome: "cancelled",
           provider: settings.provider,
+          phase: "stream" as SpeechPhase,
           ms: Date.now() - started,
         },
         "speech cancelled after synthesis (result cached)",
@@ -195,6 +221,7 @@ export async function handleSpeech(
     );
     return audio(result.audio, result.mimeType, key, "MISS", started, result.boundaries);
   } catch (error) {
+    // Classify the failure phase for structured diagnostics.
     // Client cancellation (seek / document switch / aborted prefetch) is
     // normal traffic, not a provider incident: log it as cancelled.
     if (signal?.aborted) {
@@ -203,6 +230,7 @@ export async function handleSpeech(
           event: "speech",
           outcome: "cancelled",
           provider: settings.provider,
+          phase: "stream" as SpeechPhase,
           ms: Date.now() - started,
         },
         "speech request cancelled by client",
@@ -210,6 +238,8 @@ export async function handleSpeech(
       return json(499, { error: "cancelled" }, { "cache-status": "none" });
     }
     const code = error instanceof SpeechError ? error.code : "provider_unavailable";
+    const outcome: SpeechOutcome =
+      code === "provider_timeout" ? "timeout" : "provider_error";
     const status =
       code === "invalid_request"
         ? 400
@@ -222,7 +252,7 @@ export async function handleSpeech(
     deps.logger.error(
       {
         event: "speech",
-        outcome: "error",
+        outcome,
         code,
         provider: settings.provider,
         ms: Date.now() - started,

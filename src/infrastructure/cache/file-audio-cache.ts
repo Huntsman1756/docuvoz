@@ -49,16 +49,23 @@ export class FileAudioCache {
   }
 
   set(key: string, result: SpeechResult): void {
-    mkdirSync(this.shardDir(key), { recursive: true });
-    writeFileSync(this.pathFor(key), result.audio);
-    writeFileSync(
-      `${this.pathFor(key)}.meta.json`,
-      JSON.stringify({
-        mimeType: result.mimeType,
-        boundaries: result.boundaries,
-      }),
-    );
-    this.enforceLimit();
+    try {
+      mkdirSync(this.shardDir(key), { recursive: true });
+      writeFileSync(this.pathFor(key), result.audio);
+      writeFileSync(
+        `${this.pathFor(key)}.meta.json`,
+        JSON.stringify({
+          mimeType: result.mimeType,
+          boundaries: result.boundaries,
+        }),
+      );
+      this.enforceLimit();
+    } catch {
+      // Cache write failure must NOT turn a successful synthesis into a
+      // user-visible error. The caller (speech-handler) also catches this,
+      // but we guard here too for defense in depth. Disk full, permission
+      // errors, etc. are non-fatal for the synthesis path.
+    }
   }
 
   clear(): void {

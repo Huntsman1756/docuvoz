@@ -18,7 +18,7 @@ import type {
   DocumentBlock,
   TocEntry,
 } from "@/domain/documents/types";
-import { enforceZipLimits } from "../zip-limits";
+import { enforceZipLimits, assessActualExpansion } from "../zip-limits";
 import { recordParserDiagnostic } from "@/lib/diagnostics";
 
 const ADAPTER_ID = "foliate-epub";
@@ -75,12 +75,20 @@ export const epubAdapter: DocumentAdapter = {
       loadText: async (name: string): Promise<string | null> => {
         const entry = zip.file(name);
         if (!entry) return null;
-        return entry.async("text");
+        const text = await entry.async("text");
+        // Post-decompression accounting: verify actual inflated bytes.
+        // JSZip's async() accumulates everything in memory; we reject
+        // before the adapter processes the result. For text, string length
+        // is a conservative lower bound on UTF-8 byte length.
+        assessActualExpansion(text.length, "EPUB");
+        return text;
       },
       loadBlob: async (name: string, type?: string): Promise<Blob | null> => {
         const entry = zip.file(name);
         if (!entry) return null;
         const blob = await entry.async("blob");
+        // Post-decompression accounting for binary entries.
+        assessActualExpansion(blob.size, "EPUB");
         return type ? new Blob([blob], { type }) : blob;
       },
       getSize: (name: string): number => {

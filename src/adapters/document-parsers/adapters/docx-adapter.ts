@@ -126,7 +126,14 @@ export const docxAdapter: DocumentAdapter = {
     } catch (error) {
       if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
       const msg = error instanceof Error ? error.message : String(error);
-      if (/demasiados elementos|descomprime/.test(msg)) throw error;
+      if (/demasiados elementos|descomprime|máximo seguro/.test(msg)) throw error;
+      // JSZip internal size mismatch (forged uncompressed size vs actual data):
+      // treat as a corrupt/manipulated archive.
+      if (/uncompressed data size mismatch|Bug/.test(msg)) {
+        throw new Error(
+          "El archivo DOCX parece manipulado o dañado (inconsistencia en los datos comprimidos).",
+        );
+      }
       // Not a readable ZIP: let Mammoth produce its own (clearer) failure.
     }
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
