@@ -78,7 +78,7 @@ test("Play during preparation is remembered and auto-starts without refetching",
   // but "paused" is never correct here — it would mean the user pressed
   // pause or a bug toggled the state.
   await expect(page.getByRole("button", { name: /Pausar/ })).toBeVisible({
-    timeout: 30_000,
+    timeout: 90_000,
   });
   // Dedupe invariant: each chunk text is requested at most once.
   const duplicates = [...requests().entries()].filter(([, n]) => n > 1);

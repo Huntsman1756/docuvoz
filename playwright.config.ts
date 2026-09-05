@@ -35,6 +35,7 @@ export default defineConfig({
     env: {
       NODE_ENV: "production",
       SPEECH_PROVIDER: "mock",
+      EDGE_TTS_ENABLED: "1",
       PORT: "3123",
     },
   },
