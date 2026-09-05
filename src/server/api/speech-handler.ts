@@ -12,12 +12,17 @@
  */
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { SpeechError, type SpeechProvider } from "@/domain/speech/types";
+import {
+  SpeechError,
+  type SpeechProvider,
+  type SpeechOutcome,
+  type SpeechPhase,
+} from "@/domain/speech/types";
 import { isValidEdgeVoice } from "@/adapters/speech-providers/edge-provider";
 import { computeAudioCacheKey } from "@/infrastructure/cache/cache-key";
 import { FileAudioCache } from "@/infrastructure/cache/file-audio-cache";
 import { contentFingerprint, type Logger } from "@/infrastructure/logging/logger";
-import type { EngineRuntime, ServerConfig, SpeechOutcome, SpeechPhase } from "../config";
+import type { EngineRuntime, ServerConfig } from "../config";
 import { SlidingWindowRateLimiter } from "../rate-limit";
 
 export const SpeechRequestSchema = z.object({

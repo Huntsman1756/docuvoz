@@ -245,7 +245,6 @@ export function Reader() {
       { voice: activeVoice, engine: engineId, playbackRate: rateRef.current },
     );
     playerRef.current = player;
-    player.prepare();
     return () => player.destroy();
   }, [chunks, activeVoice, engineId, playerSig, providerReady]);
 
@@ -380,8 +379,10 @@ export function Reader() {
       player.resume();
       return;
     }
-    // During preparation, record the intent — auto-starts when chunk 0 is ready.
+    // During preparation, trigger synthesis then record the intent —
+    // auto-starts when chunk 0 is ready.
     if (player.preparedCount < 1) {
+      player.prepare();
       pendingPlayRef.current = true;
       setQueuedPlay(true);
       return;

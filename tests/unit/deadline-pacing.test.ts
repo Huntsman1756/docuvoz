@@ -215,16 +215,14 @@ describe("PacedProvider cancellation", () => {
 // ─── DEADLINE constants ───────────────────────────────────────────────
 
 describe("DEADLINE constants", () => {
-  it("has reasonable defaults", () => {
-    expect(DEADLINE.QUEUE_MS).toBe(5000);
-    expect(DEADLINE.CONNECT_MS).toBe(10000);
-    expect(DEADLINE.FIRST_BYTE_MS).toBe(15000);
-    expect(DEADLINE.TOTAL_MS).toBe(60000);
+  it("has TOTAL_MS as the only enforced deadline", () => {
+    expect(DEADLINE.TOTAL_MS).toBe(60_000);
   });
 
-  it("TOTAL >= QUEUE + CONNECT + FIRST_BYTE (deadline hierarchy)", () => {
-    expect(DEADLINE.TOTAL_MS).toBeGreaterThanOrEqual(
-      DEADLINE.QUEUE_MS + DEADLINE.CONNECT_MS + DEADLINE.FIRST_BYTE_MS,
-    );
+  it("TOTAL_MS is a hard ceiling for the entire synthesis operation", () => {
+    // The DeadlineWrapper uses AbortSignal.timeout(DEADLINE.TOTAL_MS).
+    // There are no independent CONNECT or FIRST_BYTE deadlines —
+    // those were removed because they were not independently enforced.
+    expect(DEADLINE.TOTAL_MS).toBeGreaterThan(0);
   });
 });

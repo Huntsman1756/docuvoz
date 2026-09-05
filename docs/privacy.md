@@ -3,6 +3,11 @@
 This document describes exactly what data leaves the browser, per mode. No
 marketing claims: if it is not implemented, it is not promised.
 
+## Core invariant
+
+**Opening a document does NOT send its text to an external TTS provider.**
+External transmission starts when the user initiates playback or export.
+
 ## Routing matrix
 
 | Mode                | Provider selected        | Text leaves browser?    | Destination                       | When                          | Play required?                      |
@@ -17,22 +22,21 @@ marketing claims: if it is not implemented, it is not promised.
 is sent to `/api/speech` on the same origin. The server forwards it to the
 configured provider. The original document never leaves the browser.
 
-**When synthesis happens:** Only when the user presses Play (or preparation
-runs in the background). Simply loading a document does NOT send text to any
-provider — parsing and the Listen transformation happen entirely in the
-browser.
+**When synthesis happens:** Only when the user presses Play. Opening a
+document parses and transforms locally — no network requests. Pressing Play
+triggers on-demand synthesis of the current chunk, then bounded prefetch
+(2 chunks ahead) runs during playback.
 
-**Preparation behavior:** `prepare()` starts background synthesis of chunks
-in order. This means pressing Play does NOT trigger synthesis of the first
-chunk — it is already cached. Preparation is a latency optimization, not an
-eager data exfiltration.
+**No eager preparation:** `prepare()` is NOT called on document load.
+The Play button starts synthesis. If the first chunk isn't ready when Play
+is pressed, the user sees "Preparando audio..." while synthesis runs.
 
 ## Local processing
 
 - **Document parsing:** All formats (PDF, EPUB, DOCX, TXT, Markdown, HTML)
-  are parsed entirely in the browser. PDF uses pdf.js, EPUB uses foliate-js
-  - JSZip, DOCX uses mammoth.js + DOMPurify. No document bytes leave the
-    browser.
+  are parsed entirely in the browser. PDF uses pdf.js, EPUB uses fflate
+  (streaming decompression with budget enforcement), DOCX uses mammoth.js
+  - DOMPurify. No document bytes leave the browser.
 - **Listen transformation:** The spoken-representation rules engine runs
   entirely in the browser. Numbers, dates, amounts, legal references, and
   abbreviations are verbalized locally.
@@ -82,13 +86,15 @@ never the original file.
 
 ## ZIP archive protection
 
-- Metadata preflight: entry count, per-entry uncompressed size, total
-  uncompressed size, and compression ratio are checked BEFORE inflation.
-- Post-decompression accounting: actual inflated bytes are verified against
-  the budget after JSZip decompresses each entry.
-- Path traversal: absolute-like paths are rejected. JSZip normalizes `..`
-  segments, and the original unsanitized name is checked via
-  `unsafeOriginalName`.
+- **EPUB (fflate):** Entry count preflight from EOCD record. Per-entry
+  `originalSize` gate BEFORE decompression — entries exceeding the budget
+  are rejected with 0 bytes allocated. Path traversal detection on entry
+  names.
+- **DOCX (JSZip):** Metadata preflight: entry count, per-entry uncompressed
+  size, total uncompressed size, and compression ratio are checked BEFORE
+  inflation. Post-decompression accounting verifies actual inflated bytes.
+  JSZip inflates the full entry before our post-decompression check can
+  reject — this is a residual risk for metadata-forged DOCX bombs.
 
 ## HTTP body protection
 
@@ -101,10 +107,16 @@ never the original file.
 ## Operation deadlines
 
 - One coherent deadline (`DEADLINE.TOTAL_MS`, 60s) governs the entire
-  synthesis operation.
-- Phase-specific caps: queue (5s), connect (10s), first byte (15s).
-- Cancellation interrupts all phases. Client cancellation is classified
+  synthesis operation via `DeadlineWrapper` around the provider.
+- Cancellation interrupts the operation. Client cancellation is classified
   as `cancelled` (499), not as a provider error.
+
+## Backoff and retry
+
+- Local bounded exponential backoff with jitter (not Retry-After).
+- Max attempts: 3 (configurable via `SPEECH_MAX_ATTEMPTS`).
+- Base delay: 500ms, max delay: 8s.
+- Retry-After headers from providers are NOT parsed.
 
 ## Deferred (documented, not implemented)
 

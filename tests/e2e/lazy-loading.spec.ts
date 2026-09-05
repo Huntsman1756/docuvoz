@@ -82,7 +82,9 @@ test("each format lazy-loads its parser on demand; plain TXT needs none", async 
   );
 
   // Substantial parser payload fetched per format (well beyond route noise).
-  expect(epubBytes, "EPUB parser should load lazily").toBeGreaterThan(20_000);
+  // fflate is smaller than JSZip (~5KB minified vs ~96KB), so EPUB threshold
+  // is lower. DOCX still pulls mammoth (~100KB+). Markdown pulls markdown-it.
+  expect(epubBytes, "EPUB parser should load lazily").toBeGreaterThan(5_000);
   expect(docxBytes, "DOCX parser should load lazily").toBeGreaterThan(20_000);
   expect(mdBytes, "Markdown parser should load lazily").toBeGreaterThan(20_000);
   // TXT has no third-party parser: it reuses the existing bundle.

@@ -71,20 +71,39 @@ export type SpeechErrorCode =
   | "invalid_request"
   | "too_large";
 
+/**
+ * Phase classification for structured diagnostics.
+ * Each speech operation records which phase it was in when it failed.
+ */
+export type SpeechPhase = "queue" | "connect" | "first_byte" | "stream";
+
+/**
+ * Outcome classification for structured diagnostics.
+ */
+export type SpeechOutcome =
+  "success" | "cancelled" | "timeout" | "provider_error" | "queue_rejected" | "cache_hit";
+
 export class SpeechError extends Error {
   readonly code: SpeechErrorCode;
   readonly retryable: boolean;
   readonly status?: number;
+  readonly phase?: SpeechPhase;
 
   constructor(
     code: SpeechErrorCode,
     message: string,
-    options: { retryable?: boolean; status?: number; cause?: unknown } = {},
+    options: {
+      retryable?: boolean;
+      status?: number;
+      phase?: SpeechPhase;
+      cause?: unknown;
+    } = {},
   ) {
     super(message, { cause: options.cause });
     this.name = "SpeechError";
     this.code = code;
     this.retryable = options.retryable ?? false;
     this.status = options.status;
+    this.phase = options.phase;
   }
 }

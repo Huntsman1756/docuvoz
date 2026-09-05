@@ -94,6 +94,7 @@ export async function exportDocumentAudio(
     window.AudioContext ??
     (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new AudioCtx();
+  let output: Output | null = null;
 
   try {
     // Decode first chunk to verify it works and to pre-warm the AudioContext
@@ -103,7 +104,7 @@ export async function exportDocumentAudio(
 
     // Create Mediabunny output
     const target = new BufferTarget();
-    const output = new Output({
+    output = new Output({
       format: createOutputFormat(format),
       target,
     });
@@ -153,7 +154,11 @@ export async function exportDocumentAudio(
     if (!buffer) throw new Error("export_failed_no_output");
 
     return new Blob([buffer], { type: getMimeType(format) });
+  } catch (err) {
+    if (output) void output.cancel().catch(() => undefined);
+    throw err;
   } finally {
+    if (output) void output.cancel().catch(() => undefined);
     void ctx.close().catch(() => undefined);
   }
 }

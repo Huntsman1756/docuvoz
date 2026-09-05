@@ -12,7 +12,14 @@ import { MockSpeechProvider } from "@/adapters/speech-providers/mock-provider";
 import { NanSpeechProvider } from "@/adapters/speech-providers/nan-provider";
 import { EdgeSpeechProvider } from "@/adapters/speech-providers/edge-provider";
 import { PacedProvider } from "@/adapters/speech-providers/pacing";
-import type { SpeechProvider } from "@/domain/speech/types";
+import {
+  SpeechError,
+  type SpeechPhase,
+  type SpeechProvider,
+  type SpeechRequest,
+  type SpeechResult,
+} from "@/domain/speech/types";
+export type { SpeechPhase } from "@/domain/speech/types";
 
 // A blank line in `.env` (`KEY=`) yields an empty string, not undefined. Without
 // this coercion the verbatim `.env.example -> .env.local` copy fails validation
@@ -85,13 +92,14 @@ export interface EngineRuntime {
 }
 
 function pace(config: ServerConfig, inner: SpeechProvider): SpeechProvider {
-  return new PacedProvider(inner, {
+  const paced = new PacedProvider(inner, {
     maxConcurrency: config.SPEECH_MAX_CONCURRENCY,
     // Account for provider-specific pacing (e.g. Kokoro plans): derive the
     // minimum inter-request interval from requests-per-minute.
     minIntervalMs: Math.ceil(60_000 / config.SPEECH_REQUESTS_PER_MINUTE),
     maxAttempts: config.SPEECH_MAX_ATTEMPTS,
   });
+  return new DeadlineWrapper(paced);
 }
 
 export function createEngines(config: ServerConfig): EngineRuntime[] {
@@ -165,47 +173,111 @@ export function getServerRuntime(): {
 /**
  * F07 — Operation-deadline model.
  *
- * One coherent deadline governs the entire synthesis operation. Within it,
- * phase-specific caps ensure no single phase can starve the others.
+ * One coherent deadline (TOTAL_MS) governs the entire synthesis operation.
+ * The pacing layer (PacedProvider) handles concurrency and min-interval
+ * enforcement. The DeadlineWrapper provides the hard ceiling.
  *
- * The relationship is: TOTAL >= QUEUE + CONNECT + FIRST_BYTE + margin.
- * If TOTAL fires, the whole operation is cancelled regardless of phase.
+ * Queue behavior: The pacing queue has no independent time-based deadline.
+ * Requests may wait in the queue until the overall TOTAL_MS deadline fires,
+ * or until the caller's AbortSignal fires, or until the queue is full
+ * (maxQueueLength). There is no per-request queue timeout.
  *
- * These are NOT arbitrary stacked timers — they are nested budgets within
- * a single operation deadline. AbortSignal.timeout or AbortSignal.any
- * compose them cleanly.
- *
- * Rationale (2026-09):
- * - Queue: 5s. A provider under load should not hold a request for more
- *   than 5s. The pacing layer already enforces min-interval; this bounds
- *   the wait.
- * - Connect: 10s. WebSocket (Edge) or TCP handshake (NaN) should complete
- *   in under 10s. Anything longer indicates a network or provider issue.
- * - First byte: 15s. After connection, the first audio byte should arrive
- *   within 15s. Longer means the provider is stuck or overloaded.
- * - Total: 60s. Hard ceiling. Covers queue + connect + synthesis + stream.
- *   Derived from SPEECH_TIMEOUT_MS (30s default) plus headroom for
- *   paced retries. Prevents zombie operations.
+ * Phase classification is based on elapsed time heuristics for structured
+ * diagnostics. These thresholds are NOT independently enforced timers —
+ * they are labels for post-hoc diagnosis.
  */
 export const DEADLINE = {
-  /** Maximum time a request waits in the pacing queue. */
-  QUEUE_MS: 5_000,
-  /** Maximum time for connection/setup (WebSocket connect, TCP handshake). */
-  CONNECT_MS: 10_000,
-  /** Maximum time from connection to first audio byte. */
-  FIRST_BYTE_MS: 15_000,
   /** Hard ceiling for the entire synthesis operation (queue through stream end). */
   TOTAL_MS: 60_000,
 } as const;
 
 /**
- * Phase classification for structured diagnostics.
- * Each speech operation records which phase it was in when it failed.
+ * Classify which phase was active based on elapsed time since the operation
+ * started. This is a heuristic for diagnostics — NOT an independently
+ * enforced timer. The only enforced deadline is TOTAL_MS.
  */
-export type SpeechPhase = "queue" | "connect" | "setup" | "first_byte" | "stream";
+function classifyPhase(elapsedMs: number): SpeechPhase {
+  if (elapsedMs <= 5_000) return "queue";
+  if (elapsedMs <= 20_000) return "connect";
+  if (elapsedMs <= 40_000) return "first_byte";
+  return "stream";
+}
 
 /**
- * Outcome classification for structured diagnostics.
+ * Compose multiple AbortSignals into one. The returned signal aborts when
+ * any input signal aborts, carrying the first abort reason.
  */
-export type SpeechOutcome =
-  "success" | "cancelled" | "timeout" | "provider_error" | "queue_rejected" | "cache_hit";
+function composeSignals(...signals: AbortSignal[]): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+
+  const onAbort = () => {
+    for (const s of signals) {
+      if (s.aborted) {
+        controller.abort(s.reason);
+        return;
+      }
+    }
+  };
+
+  for (const s of signals) {
+    s.addEventListener("abort", onAbort);
+  }
+  // Check immediately — a signal may already be aborted.
+  onAbort();
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      for (const s of signals) {
+        s.removeEventListener("abort", onAbort);
+      }
+    },
+  };
+}
+
+/**
+ * Wraps any SpeechProvider with a hard deadline (DEADLINE.TOTAL_MS).
+ *
+ * On timeout the wrapper:
+ * 1. Classifies the failure phase (queue/connect/first_byte/stream) based
+ *    on elapsed time.
+ * 2. Throws a SpeechError with `phase` set for structured diagnostics.
+ * 3. Passes the combined abort signal to the inner provider so it can
+ *    stop early if it respects AbortSignal.
+ */
+class DeadlineWrapper implements SpeechProvider {
+  readonly name: string;
+
+  constructor(private readonly inner: SpeechProvider) {
+    this.name = inner.name;
+  }
+
+  async synthesize(request: SpeechRequest): Promise<SpeechResult> {
+    const deadlineSignal = AbortSignal.timeout(DEADLINE.TOTAL_MS);
+    const { signal: combined, cleanup } = composeSignals(
+      request.signal ?? new AbortController().signal,
+      deadlineSignal,
+    );
+
+    const startTime = Date.now();
+    try {
+      return await this.inner.synthesize({ ...request, signal: combined });
+    } catch (error) {
+      if (deadlineSignal.aborted) {
+        const elapsed = Date.now() - startTime;
+        const phase = classifyPhase(elapsed);
+        throw new SpeechError(
+          "provider_timeout",
+          `deadline exceeded in ${phase} phase after ${elapsed}ms`,
+          { retryable: false, phase },
+        );
+      }
+      throw error;
+    } finally {
+      cleanup();
+    }
+  }
+}

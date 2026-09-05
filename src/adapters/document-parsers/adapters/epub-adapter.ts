@@ -1,6 +1,6 @@
 /**
  * EPUB document adapter using vendored foliate-js (see vendor/foliate-js/README.md
- * for provenance: unmodified upstream parser + our JSZip-backed loader).
+ * for provenance: unmodified upstream parser + our fflate-backed loader).
  *
  * Parses EPUB 2/3 via the foliate-js EPUB class, extracts metadata,
  * TOC, spine order, and readable text blocks.
@@ -9,20 +9,23 @@
  *  - DRM/encrypted spine content is rejected with a clear message.
  *  - Chapters are parsed with DOMParser (inert): scripts never execute and
  *    remote resources declared by the book are never fetched.
- *  - Archive metadata is bounded by zip-limits before any inflation.
+ *  - Archive metadata is bounded by fflate's originalSize gate BEFORE any
+ *    inflation. Entries exceeding the per-entry budget are rejected with 0
+ *    bytes allocated. A secondary byte-count terminate() acts as a safety
+ *    net during streaming decompression.
  */
-import type JSZip from "jszip";
+import { Unzip, AsyncUnzipInflate } from "fflate";
 import type { DocumentAdapter, LoadOptions } from "../document-adapter";
 import type {
   StructuredDocument,
   DocumentBlock,
   TocEntry,
 } from "@/domain/documents/types";
-import { enforceZipLimits, assessActualExpansion } from "../zip-limits";
+import { ZIP_LIMITS, hasUnsafePath } from "../zip-limits";
 import { recordParserDiagnostic } from "@/lib/diagnostics";
 
 const ADAPTER_ID = "foliate-epub";
-const ADAPTER_VERSION = "1.1.0";
+const ADAPTER_VERSION = "2.0.0";
 
 /**
  * Algorithms that foliate-js can actually decrypt (the two stream
@@ -58,46 +61,40 @@ export const epubAdapter: DocumentAdapter = {
   ): Promise<StructuredDocument> {
     // @ts-expect-error — vendored ES module without type declarations
     const { EPUB } = await import("../vendor/foliate-js/epub.js");
-    const JSZip = (await import("jszip")).default;
 
-    // Build foliate-js compatible loader from JSZip. Convert to ArrayBuffer
-    // first (not raw File) so the same code path runs identically in browser
-    // and Node test environments — JSZip's Node build does not accept Blobs.
+    // Convert to ArrayBuffer for fflate compatibility in both browser and Node.
     const buffer = await file.arrayBuffer();
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
-    const zip = await JSZip.loadAsync(buffer);
-    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
-    enforceZipLimits(zip, undefined, "EPUB");
 
-    await rejectProtectedContent(zip, signal);
+    // Pre-decompress all entries via fflate with budget enforcement.
+    // fflate's Unzip processes the local file header, exposing originalSize
+    // BEFORE any decompression. We reject entries exceeding the per-entry
+    // budget without allocating decompressed memory.
+    const entries = await decompressEpubEntries(
+      new Uint8Array(buffer),
+      ZIP_LIMITS.maxEntryUncompressedBytes,
+      signal,
+    );
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+
+    // DRM check on the cached encryption.xml content
+    await rejectProtectedContent(entries, signal);
 
     const loader = {
       loadText: async (name: string): Promise<string | null> => {
-        const entry = zip.file(name);
-        if (!entry) return null;
-        const text = await entry.async("text");
-        // Post-decompression accounting: verify actual inflated bytes.
-        // JSZip's async() accumulates everything in memory; we reject
-        // before the adapter processes the result. For text, string length
-        // is a conservative lower bound on UTF-8 byte length.
-        assessActualExpansion(text.length, "EPUB");
-        return text;
+        const data = entries.get(name);
+        if (!data) return null;
+        return new TextDecoder("utf-8", { fatal: false }).decode(data);
       },
       loadBlob: async (name: string, type?: string): Promise<Blob | null> => {
-        const entry = zip.file(name);
-        if (!entry) return null;
-        const blob = await entry.async("blob");
-        // Post-decompression accounting for binary entries.
-        assessActualExpansion(blob.size, "EPUB");
-        return type ? new Blob([blob], { type }) : blob;
+        const data = entries.get(name);
+        if (!data) return null;
+        const ab = new ArrayBuffer(data.byteLength);
+        new Uint8Array(ab).set(data);
+        return type ? new Blob([ab], { type }) : new Blob([ab]);
       },
       getSize: (name: string): number => {
-        const entry = zip.file(name);
-        // JSZip exposes uncompressed size via internal _data (central directory)
-        return (
-          (entry as unknown as { _data?: { uncompressedSize?: number } })?._data
-            ?.uncompressedSize ?? 0
-        );
+        return entries.get(name)?.byteLength ?? 0;
       },
     };
 
@@ -122,14 +119,173 @@ export const epubAdapter: DocumentAdapter = {
 };
 
 /**
+ * Decompress all EPUB entries using fflate's streaming Unzip.
+ *
+ * Budget enforcement (two layers):
+ * 1. Entry count preflight from EOCD record (no allocation).
+ * 2. Per-entry: `originalSize` gate BEFORE `start()` — entries exceeding the
+ *    budget are rejected with 0 bytes allocated.
+ * 3. Per-entry: actual byte counting during streaming decompression — if
+ *    decompressed bytes exceed the budget mid-stream, `terminate()` is called
+ *    to kill the worker and reject. This catches metadata-forged entries where
+ *    originalSize is small but actual inflated output is large.
+ *
+ * Returns a Map of entry name → decompressed Uint8Array.
+ */
+async function decompressEpubEntries(
+  data: Uint8Array,
+  maxEntryBytes: number,
+  signal?: AbortSignal,
+): Promise<Map<string, Uint8Array>> {
+  // ENTRY-COUNT PREFLIGHT: parse the end-of-central-directory record to
+  // get the total entry count without allocating decompressed memory.
+  const eocdOffset = findEOCD(data);
+  if (eocdOffset >= 0) {
+    const entryCount = data[eocdOffset + 10] | (data[eocdOffset + 11] << 8);
+    if (entryCount > ZIP_LIMITS.maxEntries) {
+      throw new Error(
+        `El EPUB contiene demasiados elementos (${entryCount}). ` +
+          `El máximo admitido es ${ZIP_LIMITS.maxEntries}.`,
+      );
+    }
+  }
+
+  const result = new Map<string, Uint8Array>();
+  const chunks = new Map<string, Uint8Array[]>();
+  let rejected = false;
+
+  return new Promise<Map<string, Uint8Array>>((resolve, reject) => {
+    const u = new Unzip((file) => {
+      if (rejected) return;
+
+      // PATH TRAVERSAL: reject absolute-like paths
+      if (hasUnsafePath(file.name)) {
+        rejected = true;
+        reject(
+          new Error(
+            "El EPUB contiene rutas no válidas. " +
+              "El archivo parece manipulado o dañado.",
+          ),
+        );
+        return;
+      }
+
+      // DECLARED-SIZE GATE: check originalSize before calling start().
+      // This prevents allocation for entries with honest metadata.
+      if (file.originalSize != null && file.originalSize > maxEntryBytes) {
+        rejected = true;
+        reject(
+          new Error(
+            `Un elemento del EPUB ocupa ${(file.originalSize / 1024 / 1024).toFixed(0)} MB, ` +
+              `por encima del máximo seguro de ${(maxEntryBytes / 1024 / 1024).toFixed(0)} MB. ` +
+              "El archivo parece manipulado o dañado.",
+          ),
+        );
+        return;
+      }
+
+      // ACTUAL BYTE GATE: count decompressed bytes during streaming.
+      // This catches metadata-forged entries where originalSize is small
+      // but actual inflated output exceeds the budget.
+      let entryDecompressedBytes = 0;
+
+      file.ondata = (err, data, final) => {
+        if (err || rejected) {
+          if (!rejected && err) {
+            rejected = true;
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }
+          return;
+        }
+        if (data) {
+          entryDecompressedBytes += data.length;
+
+          // ACTUAL BYTE GATE: if decompressed bytes exceed budget,
+          // terminate the worker immediately.
+          if (entryDecompressedBytes > maxEntryBytes) {
+            rejected = true;
+            file.terminate();
+            reject(
+              new Error(
+                `Un elemento del EPUB descomprime ${(entryDecompressedBytes / 1024 / 1024).toFixed(0)} MB ` +
+                  `realmente, por encima del máximo seguro de ${(maxEntryBytes / 1024 / 1024).toFixed(0)} MB. ` +
+                  "El archivo parece manipulado o dañado.",
+              ),
+            );
+            return;
+          }
+
+          const existing = chunks.get(file.name);
+          if (existing) {
+            existing.push(data);
+          } else {
+            chunks.set(file.name, [data]);
+          }
+        }
+        if (final) {
+          const parts = chunks.get(file.name);
+          if (parts) {
+            const total = parts.reduce((sum, p) => sum + p.length, 0);
+            const merged = new Uint8Array(total);
+            let offset = 0;
+            for (const part of parts) {
+              merged.set(part, offset);
+              offset += part.length;
+            }
+            result.set(file.name, merged);
+          }
+        }
+      };
+      file.start();
+    });
+    u.register(AsyncUnzipInflate);
+
+    u.push(data, true);
+
+    setTimeout(() => {
+      if (rejected) return;
+      if (signal?.aborted) {
+        reject(new DOMException("Cancelled", "AbortError"));
+        return;
+      }
+      resolve(result);
+    }, 0);
+  });
+}
+
+/**
+ * Find the End-of-Central-Directory record in a ZIP file by scanning
+ * backwards for the EOCD signature (0x06054b50). Returns the offset
+ * of the signature, or -1 if not found.
+ */
+function findEOCD(data: Uint8Array): number {
+  // EOCD record is at most 65557 bytes from the end of the file
+  const start = Math.max(0, data.length - 65557);
+  for (let i = data.length - 22; i >= start; i--) {
+    if (
+      data[i] === 0x50 &&
+      data[i + 1] === 0x4b &&
+      data[i + 2] === 0x05 &&
+      data[i + 3] === 0x06
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
  * Fail fast on documents whose readable content is encrypted with an
  * algorithm this app cannot (and must not) bypass. Font-only stream
  * obfuscation (the two idpf/adobe schemes) remains supported upstream.
  */
-async function rejectProtectedContent(zip: JSZip, signal?: AbortSignal): Promise<void> {
-  const entry = zip.file("META-INF/encryption.xml");
-  if (!entry) return;
-  const xml = await entry.async("text");
+async function rejectProtectedContent(
+  entries: Map<string, Uint8Array>,
+  signal?: AbortSignal,
+): Promise<void> {
+  const encData = entries.get("META-INF/encryption.xml");
+  if (!encData) return;
+  const xml = new TextDecoder().decode(encData);
   if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
   const doc = new DOMParser().parseFromString(xml, "application/xml");
   for (const ed of Array.from(

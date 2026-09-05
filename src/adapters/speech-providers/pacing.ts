@@ -5,8 +5,8 @@
  * - a global concurrency cap (default 1: do not parallelize aggressively),
  * - a minimum inter-request interval (token-bucket style pacing that models
  *   provider-specific per-minute limits),
- * - bounded retries with exponential backoff + jitter, honoring Retry-After
- *   semantics carried by SpeechError.status.
+ * - bounded retries with local bounded exponential backoff + jitter
+ *   (NOT Retry-After parsing; backoff is fully client-driven).
  *
  * Cancellation is passed through to the wrapped provider.
  *

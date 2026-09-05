@@ -12,6 +12,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
+import { buildSampleEpub } from "./helpers/doc-fixtures";
 
 async function loadFixture(page: Page, title: string) {
   await page.goto("/");
@@ -296,4 +297,54 @@ test("document switching does not produce AbortError in the browser", async ({
     (e) => e.includes("AbortError") || e.includes("signal is aborted"),
   );
   expect(abortErrors).toHaveLength(0);
+});
+
+test("opening a document does NOT send text externally — only Play triggers synthesis", async ({
+  page,
+}) => {
+  // Privacy contract: opening a document must not send any text to /api/speech.
+  // Only clicking Play should trigger synthesis requests.
+  await page.goto("/");
+
+  // Track all /api/speech requests
+  let speechRequestCount = 0;
+  let firstSpeechRequestTime = 0;
+  page.on("request", (req) => {
+    if (req.url().includes("/api/speech") && req.method() === "POST") {
+      speechRequestCount++;
+      if (firstSpeechRequestTime === 0) firstSpeechRequestTime = Date.now();
+    }
+  });
+
+  // Load a document
+  const epub = await buildSampleEpub();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "privacy-test.epub",
+    mimeType: "application/epub+zip",
+    buffer: epub.buffer,
+  });
+
+  // Wait for document to load (doc name visible, play button enabled)
+  await page.locator(".reader-doc-name").waitFor({ timeout: 30_000 });
+  const play = page.getByRole("button", { name: /Escuchar/ });
+  await expect(play).toBeVisible();
+  await expect(play).toBeEnabled();
+
+  // Wait several seconds WITHOUT clicking Play
+  await page.waitForTimeout(3_000);
+
+  // CRITICAL: No speech requests should have been made
+  expect(speechRequestCount).toBe(0);
+
+  // Now click Play — synthesis should start ONLY after this click
+  const playClickTime = Date.now();
+  await play.click();
+
+  // Wait for first speech request to arrive
+  await expect(async () => {
+    expect(speechRequestCount).toBeGreaterThan(0);
+  }).toPass({ timeout: 30_000 });
+
+  // The first speech request must occur AFTER the Play click
+  expect(firstSpeechRequestTime).toBeGreaterThanOrEqual(playClickTime);
 });
