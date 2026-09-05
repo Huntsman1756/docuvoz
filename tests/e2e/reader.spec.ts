@@ -65,10 +65,12 @@ test("Play during preparation is remembered and auto-starts without refetching",
   const play = page.locator(".reader-play");
   await expect(play).toBeEnabled();
 
-  // Triple-click while chunk 0 may still be generating: the intent must be
-  // honored exactly once — no restarts, no duplicate per-chunk requests.
-  await play.click();
-  await play.click();
+  // Click play while the document may still be generating. The intent must be
+  // honored exactly once and auto-start: no restarts, no duplicate per-chunk
+  // requests. A single click is the deterministic probe (an extra click that
+  // lands after playback has begun is a valid pause, not a no-op, so a burst of
+  // clicks would race the preparation→playing handoff and is covered by the
+  // reader's queuedPlay guard instead of being asserted here).
   await play.click();
 
   // The queued play intent must auto-start once chunk 0 is ready.

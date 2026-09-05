@@ -50,6 +50,34 @@ export interface EdgeProviderOptions {
   maxClients?: number;
 }
 
+/**
+ * Race a promise against an AbortSignal. If the signal is already aborted,
+ * rejects immediately. If the signal fires while the promise is pending,
+ * rejects with SpeechError("provider_timeout", "aborted by client").
+ */
+function abortRace<T>(signal: AbortSignal | undefined, promise: Promise<T>): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) {
+    return Promise.reject(new SpeechError("provider_timeout", "aborted by client"));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(new SpeechError("provider_timeout", "aborted by client"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
 export class EdgeSpeechProvider implements SpeechProvider {
   readonly name = "edge";
 
@@ -108,16 +136,35 @@ export class EdgeSpeechProvider implements SpeechProvider {
     if (request.signal?.aborted) {
       throw new SpeechError("provider_timeout", "aborted before synthesis");
     }
+
+    // Race client creation against the abort signal. If the signal fires
+    // during the WebSocket connection phase (setMetadata → _initClient),
+    // we detect it here instead of missing it.
     let client: MsEdgeTTS;
     try {
-      client = await this.clientFor(voice);
+      client = await abortRace(request.signal, this.clientFor(voice));
     } catch (error) {
+      // Abort during client creation: evict only if it was a real failure,
+      // not an intentional cancellation. The evict call is harmless for abort
+      // because the client promise resolves normally even on abort.
+      if (error instanceof SpeechError && error.code === "provider_timeout") {
+        // Intentional cancellation — no eviction needed; the caller (handleSpeech)
+        // will log it as "cancelled" and return 499.
+        throw error;
+      }
       this.evict(voice);
       throw new SpeechError("provider_unavailable", "edge tts connect failed", {
         retryable: true,
         cause: error,
       });
     }
+
+    // Double-check: signal may have fired between the abortRace resolving
+    // and this line executing.
+    if (request.signal?.aborted) {
+      throw new SpeechError("provider_timeout", "aborted by client");
+    }
+
     const started = Date.now();
     const { audioStream, metadataStream } = client.toStream(escapeSsmlText(request.text));
     const chunks: Buffer[] = [];
@@ -169,7 +216,15 @@ export class EdgeSpeechProvider implements SpeechProvider {
         const onAbort = () => {
           reject(new SpeechError("provider_timeout", "aborted by client"));
         };
+        // Register abort handler AND check if already aborted. The abort
+        // event is only dispatched once; if the signal fired before we
+        // registered this handler, we must detect it here.
         request.signal?.addEventListener("abort", onAbort, { once: true });
+        if (request.signal?.aborted) {
+          request.signal.removeEventListener("abort", onAbort);
+          reject(new SpeechError("provider_timeout", "aborted by client"));
+          return;
+        }
         audioStream.on("data", (c: Buffer) => chunks.push(Buffer.from(c)));
         audioStream.once("end", () => {
           clearTimeout(timer);
@@ -179,6 +234,16 @@ export class EdgeSpeechProvider implements SpeechProvider {
         audioStream.once("error", (err: Error) => {
           clearTimeout(timer);
           request.signal?.removeEventListener("abort", onAbort);
+          // If the signal is aborted, the stream error is caused by our
+          // eviction/close — treat as expected cancellation, not provider error.
+          if (request.signal?.aborted) {
+            reject(
+              new SpeechError("provider_timeout", "aborted by client", {
+                cause: err,
+              }),
+            );
+            return;
+          }
           reject(
             new SpeechError("provider_error", `edge tts stream error: ${err.message}`, {
               retryable: true,
@@ -188,7 +253,13 @@ export class EdgeSpeechProvider implements SpeechProvider {
         });
       });
     } catch (error) {
-      // The websocket behind this voice may be wedged; force a fresh one next
+      // Intentional cancellation: clean up streams but do NOT evict the
+      // client — the WebSocket is still valid for the next request.
+      if (error instanceof SpeechError && error.code === "provider_timeout") {
+        audioStream.destroy();
+        throw error;
+      }
+      // Real failure: the websocket may be wedged; force a fresh one next
       // time (a stale socket is the most common failure mode of this endpoint).
       audioStream.destroy();
       this.evict(voice);

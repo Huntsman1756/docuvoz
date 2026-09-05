@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StructuredDocument } from "@/domain/documents/types";
 import type { SpokenMode } from "@/domain/spoken/types";
-import { buildSpokenPlan } from "@/domain/spoken/pipeline";
+import { buildProductSpokenPlan as buildSpokenPlan } from "@/lib/product-spoken-plan";
 import { planChunks } from "@/domain/spoken/speech-plan";
 import {
   resolveAdapter,
@@ -62,6 +62,7 @@ export function Reader() {
   const [engineChoice, setEngineChoice] = useState<EngineChoice>("auto");
   const [voice, setVoice] = useState<string>(() => defaultVoice("es", "default"));
   const [rate, setRate] = useState(1);
+  const rateRef = useRef(rate);
   const [playerState, setPlayerState] = useState<BufferedPlayerState>("idle");
   const [chunkIndex, setChunkIndex] = useState(0);
   const [prep, setPrep] = useState<{ sig: string; ready: number; failed: boolean }>({
@@ -76,6 +77,9 @@ export function Reader() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [showToc, setShowToc] = useState(false);
+  // Provider metadata from /api/health has resolved; only then do we build the
+  // player so "auto" resolves once to its final engine/voice (no rebuild churn).
+  const [providerReady, setProviderReady] = useState(false);
 
   const playerRef = useRef<BufferedSpeechPlayer | null>(null);
   const genRef = useRef(0);
@@ -98,7 +102,12 @@ export function Reader() {
       .then((body: { engines?: EngineDescriptor[] } | null) =>
         setEngines(body?.engines?.filter((e) => e.id in ENGINES) ?? []),
       )
-      .catch(() => setEngines([]));
+      .catch(() => setEngines([]))
+      // Provider metadata (which engine/voice "auto" resolves to) is now final.
+      // Building the player before this point would resolve "auto" to a
+      // placeholder engine and then rebuild the player once the real engines
+      // land — destroying in-flight playback and re-synthesizing every chunk.
+      .finally(() => setProviderReady(true));
   }, []);
 
   /* ---- document text for language detection ---- */
@@ -187,6 +196,13 @@ export function Reader() {
       playerRef.current = null;
       return;
     }
+    // Wait for provider metadata before building: "auto" resolves to a real
+    // engine/voice only once /api/health has answered. Building earlier then
+    // rebuilding would kill playback and re-synthesize the whole document.
+    if (!providerReady) {
+      playerRef.current = null;
+      return;
+    }
     const sig = playerSig;
     const player = new BufferedSpeechPlayer(
       chunks,
@@ -226,21 +242,25 @@ export function Reader() {
           if (ready > 0) setErrorText(null);
         },
       },
-      { voice: activeVoice, engine: engineId },
+      { voice: activeVoice, engine: engineId, playbackRate: rateRef.current },
     );
     playerRef.current = player;
     player.prepare();
     return () => player.destroy();
-  }, [chunks, activeVoice, engineId, playerSig]);
+  }, [chunks, activeVoice, engineId, playerSig, providerReady]);
 
   useEffect(() => {
+    rateRef.current = rate;
     playerRef.current?.setPlaybackRate(rate);
   }, [rate]);
 
   // Auto-start playback when the first chunk is ready and the user requested it.
+  // Fire exactly once per intent: clear the pending flag as we start, so a run
+  // of prepared-chunk updates cannot re-invoke play(0) and restart playback.
   useEffect(() => {
     const player = playerRef.current;
     if (player && pendingPlayRef.current && prepared >= 1) {
+      pendingPlayRef.current = false;
       void player.play(0);
     }
   }, [prepared]);
@@ -346,6 +366,11 @@ export function Reader() {
   const playPause = useCallback(() => {
     const player = playerRef.current;
     if (!player) return;
+    // A play intent is pending (queued during preparation / auto-start in
+    // flight): an extra click must not toggle pause mid-transition. It would
+    // otherwise race the "Preparando audio…" → playing handoff and leave the
+    // player paused before the user ever heard it.
+    if (queuedPlay) return;
     const st = player.currentState;
     if (st === "playing") {
       player.pause();
@@ -368,7 +393,7 @@ export function Reader() {
     }
     // Default: play from the current position (or beginning if idle).
     void player.play(undefined);
-  }, []);
+  }, [queuedPlay]);
 
   /* ---- export ---- */
   const runExport = useCallback(
@@ -417,7 +442,7 @@ export function Reader() {
     } else {
       setShowExportDialog(true);
     }
-  }, [exporting, cancelExport]);
+  }, [exporting, cancelExport, setShowExportDialog]);
 
   /* ---- explicit reader phase (product-facing state machine) ---- */
   const firstReady = prepared >= 1 || playerState !== "idle";

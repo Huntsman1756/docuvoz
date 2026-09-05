@@ -26,7 +26,7 @@ import {
   buildDocument,
   type RawPdfPage,
 } from "@/adapters/document-parsers/build-document";
-import { buildSpokenPlan } from "@/domain/spoken/pipeline";
+import { buildProductSpokenPlan as buildSpokenPlan } from "@/lib/product-spoken-plan";
 import { planChunks } from "@/domain/spoken/speech-plan";
 import {
   asFile,

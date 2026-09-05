@@ -81,13 +81,8 @@ export interface ProviderCapabilities {
   supportsExactDuration: boolean;
 }
 
-const DEFAULT_GAP = 0;
 const DEFAULT_MAX_BUFFERS = 6;
 const DEFAULT_MAX_AHEAD_SEC = 60;
-const DEFAULT_SILENCE_THRESH = 0.002;
-const DEFAULT_FADE_MS = 5;
-const DEFAULT_HEAD_PAD_MS = 20;
-const DEFAULT_TAIL_PAD_MS = 50;
 
 /* ─── Helpers ───────────────────────────────────────────────────────────── */
 
@@ -154,509 +149,347 @@ function trimSilence(
 
 /* ─── Engine ────────────────────────────────────────────────────────────── */
 
-interface ChunkSlot {
+interface ScheduledSource {
+  node: AudioBufferSourceNode;
   index: number;
-  buffer: AudioBuffer;
-  duration: number;
+  endTime: number;
 }
 
 export class BufferedAudioEngine {
   private ctx: AudioContext | null = null;
   private state: AudioEngineState = "idle";
-  private analyser: AnalyserNode | null = null;
-
-  // Decoded buffer pool (bounded)
-  private pool: Map<number, ChunkSlot> = new Map();
-
-  // Scheduling state
-  private nextIndex = 0;
-  private _totalDuration = 0;
-
-  // Playback state
-  private source: AudioBufferSourceNode | null = null;
-  private sourceStartCtx = 0;
-  private playingBuf: AudioBuffer | null = null;
-  private playingIdx = -1;
-  private playingOffset = 0;
-  private playingRate = 1;
-  private rate = 1;
-
-  // Gapless scheduling: AudioContext time when the next source should start
-  private nextStartTime = 0;
-  // Generation counter: incremented on seek/pause/stop to invalidate pending proactive timers
-  private scheduleGeneration = 0;
-
-  // Back-pressure
-  private _decodedAheadSec = 0;
-
-  // Word boundary tracking
-  private wordBoundaryIndex = -1;
-  private lastBoundaryCtxTime = 0;
-
-  // Abort
-  private decodeAbort = new AbortController();
-
-  // Config
-  private readonly sentenceGap: number;
-  private readonly paragraphGap: number;
-  private readonly sectionGap: number;
-  private readonly defaultGap: number;
-  private readonly maxAheadSec: number;
-  private readonly maxPool: number;
-  private readonly silenceThresh: number;
-  private readonly fadeMs: number;
-  private readonly headPadMs: number;
-  private readonly tailPadMs: number;
-  private readonly capabilities: ProviderCapabilities;
-  private readonly chunkBoundariesMap: Map<number, ChunkBoundaries>;
-
-  // Events
-  private ev: AudioEngineEvents;
+  private pool = new Map<number, AudioBuffer>();
+  private durations = new Map<number, number>();
+  private gaps = new Map<number, number>();
+  private sources = new Set<ScheduledSource>();
+  private decoding = new Map<number, Promise<void>>();
+  private generation = 0;
   private destroyed = false;
+  private intent = false;
+  private totalChunks = 0;
+  private rate = 1;
+  private position = 0;
+  private anchorContext = 0;
+  private anchorDocument = 0;
+  private horizon = 0;
+  private nextIndex = 0;
+  private audibleIndex = -1;
+  private boundaries: Map<number, ChunkBoundaries>;
 
-  constructor(ev: AudioEngineEvents, opts?: BufferedAudioEngineOptions) {
-    this.ev = ev;
-    this.sentenceGap = opts?.sentenceGap ?? 0.1;
-    this.paragraphGap = opts?.paragraphGap ?? 0.25;
-    this.sectionGap = opts?.sectionGap ?? 0.4;
-    this.defaultGap = opts?.defaultGap ?? DEFAULT_GAP;
-    this.maxAheadSec = opts?.maxAheadSec ?? DEFAULT_MAX_AHEAD_SEC;
-    this.maxPool = opts?.maxDecodedBuffers ?? DEFAULT_MAX_BUFFERS;
-    this.silenceThresh = opts?.silenceThresh ?? DEFAULT_SILENCE_THRESH;
-    this.fadeMs = opts?.fadeMs ?? DEFAULT_FADE_MS;
-    this.headPadMs = opts?.headPadMs ?? DEFAULT_HEAD_PAD_MS;
-    this.tailPadMs = opts?.tailPadMs ?? DEFAULT_TAIL_PAD_MS;
-    this.capabilities = opts?.providerCapabilities ?? {
-      supportsWordBoundaries: false,
-      supportsStreaming: false,
-      supportsExactDuration: false,
-    };
-    this.chunkBoundariesMap = opts?.chunkBoundaries ?? new Map();
+  constructor(
+    private ev: AudioEngineEvents,
+    private opts: BufferedAudioEngineOptions = {},
+  ) {
+    this.boundaries = new Map(opts.chunkBoundaries);
   }
-
-  /* ── lifecycle ──────────────────────────────────────────────────────── */
-
   async init(): Promise<void> {
-    if (this.ctx == null) {
-      this.ctx = new AudioContext();
-      this.analyser = this.ctx.createAnalyser();
-      this.analyser.fftSize = 256;
-      this.analyser.connect(this.ctx.destination);
-    }
+    if (this.destroyed) return;
+    this.ctx ??= new AudioContext();
     if (this.ctx.state === "suspended") await this.ctx.resume();
   }
-
-  destroy(): void {
-    this.destroyed = true;
-    this.scheduleGeneration++;
-    this.decodeAbort.abort();
-    this.stopSource();
-    this.pool.clear();
-    this._totalDuration = 0;
-    this._decodedAheadSec = 0;
-    this.nextStartTime = 0;
-    if (this.ctx) {
-      void this.ctx.close().catch(() => undefined);
-      this.ctx = null;
-    }
-    this.analyser = null;
-    this.setState("idle");
-  }
-
-  /* ── getters ────────────────────────────────────────────────────────── */
-
-  get currentState(): AudioEngineState {
+  get currentState() {
     return this.state;
   }
-  get isBuffering(): boolean {
+  get isBuffering() {
     return this.state === "buffering";
   }
-  hasBuffer(index: number): boolean {
+  hasBuffer(index: number) {
     return this.pool.has(index);
   }
-  get decodedCount(): number {
+  get decodedCount() {
     return this.pool.size;
   }
-  get totalDuration(): number {
-    return this._totalDuration;
+  get knownDurationCount() {
+    return this.durations.size;
   }
-
-  /** Elapsed document time (seconds). */
+  get totalDuration() {
+    return [...this.durations.entries()].reduce(
+      (sum, [i, d]) => sum + d + this.gap(i),
+      0,
+    );
+  }
+  get estimatedDuration() {
+    const average = this.durations.size ? this.totalDuration / this.durations.size : 0;
+    return (
+      this.totalDuration + Math.max(0, this.totalChunks - this.durations.size) * average
+    );
+  }
+  setTotalChunks(n: number) {
+    this.totalChunks = n;
+  }
+  get supportsWordBoundaries() {
+    return (
+      this.opts.providerCapabilities?.supportsWordBoundaries === true ||
+      this.boundaries.size > 0
+    );
+  }
   get currentTime(): number {
-    if (this.state !== "playing" || !this.source || !this.ctx) return this.playingOffset;
-    const elapsed = this.ctx.currentTime - this.sourceStartCtx;
-    return this.playingOffset + Math.min(elapsed, this.playingBuf?.duration ?? 0);
+    if (!this.intent || !this.ctx || this.state !== "playing") return this.position;
+    return Math.min(
+      this.horizon,
+      this.anchorDocument +
+        Math.max(0, this.ctx.currentTime - this.anchorContext) * this.rate,
+    );
   }
-
-  /** Cumulative document time (seconds) of the chunk at `index`.  Returns 0 if not decoded. */
   chunkTime(index: number): number {
-    let accum = 0;
-    const entries = [...this.pool.values()].sort((a, b) => a.index - b.index);
-    for (const slot of entries) {
-      if (slot.index >= index) return accum;
-      accum += slot.duration + this.gapForIndex(slot.index);
+    let time = 0;
+    for (let i = 0; i < index; i++) time += (this.durations.get(i) ?? 0) + this.gap(i);
+    return time;
+  }
+  private indexAt(time: number): number {
+    let start = 0;
+    for (let i = 0; i < this.totalChunks; i++) {
+      const duration = this.durations.get(i);
+      if (duration === undefined || time < start + duration + this.gap(i)) return i;
+      start += duration + this.gap(i);
     }
-    return accum;
+    return this.totalChunks;
   }
-
-  /** Whether the provider supports word-level timing. */
-  get supportsWordBoundaries(): boolean {
-    return this.capabilities.supportsWordBoundaries;
-  }
-
-  /* ── playback controls ──────────────────────────────────────────────── */
-
   play(): void {
-    if (this.destroyed || this.state === "playing") return;
-    void this.init().then(() => {
-      if (this.destroyed) return;
-      if (this.state === "ended" || this.state === "idle") {
-        this.playingOffset = 0;
-        this.playingBuf = null;
-        this.playingIdx = -1;
-        this._totalDuration = 0;
-        this.pool.clear();
-        this.nextIndex = 0;
-        this._decodedAheadSec = 0;
-        this.wordBoundaryIndex = -1;
-        this.nextStartTime = this.ctx?.currentTime ?? 0;
-      }
-      this.scheduleNext();
-    });
+    if (this.destroyed || this.intent) return;
+    if (this.state === "ended") this.position = 0;
+    this.intent = true;
+    const generation = this.generation;
+    void this.init()
+      .then(() => {
+        if (this.destroyed || generation !== this.generation || !this.intent) return;
+        this.restart();
+      })
+      .catch(() => {
+        if (!this.destroyed) this.ev.onError?.("audio_context_error");
+      });
   }
-
   pause(): void {
-    if (this.state !== "playing") return;
-    if (this.ctx && this.source && this.playingBuf) {
-      this.playingOffset += Math.min(
-        this.ctx.currentTime - this.sourceStartCtx,
-        this.playingBuf.duration,
-      );
-    }
-    this.scheduleGeneration++;
-    this.stopSource();
-    this.state = "paused";
-    this.ev.onStateChange("paused");
+    if (this.destroyed) return;
+    this.position = this.currentTime;
+    this.intent = false;
+    this.invalidate();
+    this.setState("paused");
   }
-
   resume(): void {
-    if (this.state !== "paused") return;
-    this.state = "playing";
-    this.ev.onStateChange("playing");
-    // Reset word boundary tracking on resume
-    this.wordBoundaryIndex = -1;
-    this.lastBoundaryCtxTime = 0;
-    // Reset nextStartTime to start from now
-    this.nextStartTime = this.ctx?.currentTime ?? 0;
-    if (this.playingBuf && this.playingOffset < this.playingBuf.duration) {
-      this.scheduleSource(
-        this.playingIdx,
-        this.playingBuf,
-        this.playingOffset,
-        this.playingRate,
-      );
-    } else {
-      this.scheduleNext();
-    }
+    this.play();
   }
-
   stop(): void {
-    this.playingOffset = 0;
-    this.playingBuf = null;
-    this.playingIdx = -1;
-    this._totalDuration = 0;
-    this.pool.clear();
-    this.nextIndex = 0;
-    this._decodedAheadSec = 0;
-    this.wordBoundaryIndex = -1;
-    this.nextStartTime = 0;
-    this.scheduleGeneration++;
-    this.stopSource();
+    this.intent = false;
+    this.invalidate();
+    this.position = 0;
+    this.audibleIndex = -1;
     this.setState("idle");
   }
-
-  /** Seek to a document time position (seconds). */
-  seek(time: number): void {
+  destroy(): void {
     if (this.destroyed) return;
-    this.scheduleGeneration++;
-    this.state = "seeking";
-    this.stopSource();
-    this.playingOffset = 0;
-    this.playingBuf = null;
-    this.playingIdx = -1;
-    this.wordBoundaryIndex = -1;
-    this.lastBoundaryCtxTime = 0;
-
-    let accum = 0;
-    for (const slot of this.pool.values()) {
-      if (time >= accum && time < accum + slot.duration) {
-        this.playingOffset = time - accum;
-        this.playingBuf = slot.buffer;
-        this.playingIdx = slot.index;
-        this.playingRate = this.rate;
-        // Set nextStartTime to start after this chunk ends
-        const remainingDur = (slot.duration - this.playingOffset) / this.rate;
-        const gap = this.gapForIndex(slot.index);
-        this.nextStartTime = (this.ctx?.currentTime ?? 0) + remainingDur + gap;
-        this.scheduleSource(slot.index, slot.buffer, this.playingOffset, this.rate);
-        this.state = "playing";
-        return;
+    this.stop();
+    this.destroyed = true;
+    this.pool.clear();
+    this.durations.clear();
+    this.gaps.clear();
+    this.decoding.clear();
+    this.boundaries.clear();
+    void this.ctx?.close().catch(() => undefined);
+    this.ctx = null;
+  }
+  seek(time: number, autoplay = this.intent): void {
+    if (this.destroyed || !Number.isFinite(time)) return;
+    this.invalidate();
+    this.position = Math.max(0, Math.min(time, this.estimatedDuration));
+    this.intent = autoplay;
+    if (autoplay) this.restart();
+    else this.setState("paused");
+    this.update();
+  }
+  setPlaybackRate(rate: number): void {
+    if (!Number.isFinite(rate) || rate <= 0 || rate === this.rate) return;
+    this.position = this.currentTime;
+    this.invalidate();
+    this.rate = rate;
+    if (this.intent) this.restart();
+  }
+  private invalidate(): void {
+    this.generation++;
+    for (const source of this.sources) {
+      source.node.onended = null;
+      try {
+        source.node.stop();
+      } catch {
+        /* already stopped */
       }
-      accum += slot.duration + this.gapForIndex(slot.index);
+      source.node.disconnect();
     }
-    // Seek target is beyond decoded range; schedule next available
-    this.playingOffset = time;
-    this.nextStartTime = this.ctx?.currentTime ?? 0;
-    this.scheduleNext();
+    this.sources.clear();
   }
-
-  /** Change playback rate.  Does NOT trigger TTS regeneration. */
-  setPlaybackRate(r: number): void {
-    this.rate = r;
-    this.playingRate = r;
-    if (this.source && this.playingBuf && this.ctx) {
-      const offset = Math.min(
-        this.ctx.currentTime - this.sourceStartCtx,
-        this.playingBuf.duration,
-      );
-      this.stopSource();
-      // Reset nextStartTime for immediate scheduling at new rate
-      this.nextStartTime = this.ctx.currentTime;
-      this.scheduleSource(this.playingIdx, this.playingBuf, offset, r);
-    }
+  private restart(): void {
+    if (!this.ctx || !this.intent || this.destroyed) return;
+    this.nextIndex = this.indexAt(this.position);
+    this.anchorContext = this.ctx.currentTime + 0.03;
+    this.anchorDocument = this.position;
+    this.horizon = this.position;
+    this.schedule();
   }
-
-  /* ── blob enqueue ───────────────────────────────────────────────────── */
-
   async enqueue(index: number, blob: Blob): Promise<void> {
     if (this.destroyed || this.pool.has(index)) return;
-    if (!this.ctx) return;
-
+    const existing = this.decoding.get(index);
+    if (existing) return existing;
+    const work = this.decode(index, blob);
+    this.decoding.set(index, work);
     try {
-      if (this.decodeAbort.signal.aborted) return;
-      const ab = await blob.arrayBuffer();
-      if (this.destroyed) return;
-
-      const buf = await this.ctx.decodeAudioData(ab);
-      if (this.destroyed) return;
-
-      // Trim silence with speech-bound detection
-      const trimmed = trimSilence(
-        this.ctx,
-        buf,
-        this.silenceThresh,
-        this.fadeMs,
-        this.headPadMs,
-        this.tailPadMs,
-      );
-      const dur = trimmed.duration;
-
-      this.pool.set(index, { index, buffer: trimmed, duration: dur });
-      this._totalDuration += dur;
-
-      // Track decoded-ahead time for back-pressure
-      this._decodedAheadSec += dur + this.gapForIndex(index);
-
-      // Evict old buffers beyond maxPool
-      while (this.pool.size > this.maxPool) {
-        const oldest = this.pool.keys().next().value;
-        if (oldest !== undefined) {
-          this._decodedAheadSec -=
-            this.pool.get(oldest)!.duration + this.gapForIndex(oldest);
-          this.pool.delete(oldest);
-        }
-      }
-
-      // Notify events
-      if (this.state === "idle") {
-        this.state = "buffering";
-        this.ev.onStateChange("buffering");
-      }
-      if (this.state === "buffering") {
-        this.state = "playing";
-        this.ev.onStateChange("playing");
-      }
-      if (this.state === "playing") {
-        this.scheduleNext();
-      }
-    } catch {
-      if (!this.destroyed) {
-        this.ev.onError?.("decode_error");
-      }
+      await work;
+    } finally {
+      this.decoding.delete(index);
     }
   }
-
-  /** Compute gap for a given chunk index based on structural info. */
-  private gapForIndex(index: number): number {
-    const bounds = this.chunkBoundariesMap.get(index);
-    if (bounds && bounds.boundaries.length > 0) {
-      // Use last boundary's text to determine structure
-      const lastWord = bounds.boundaries[bounds.boundaries.length - 1].word;
-      if (lastWord.match(/[.!?\n]$/)) return this.sectionGap;
-      if (lastWord.match(/[,;:;]$/)) return this.sentenceGap * 0.5;
-      return this.sentenceGap;
-    }
-    return this.defaultGap;
-  }
-
-  /** Get word boundary for the current playback time. */
-  getCurrentWordBoundaries(): WordBoundary[] {
-    if (!this.supportsWordBoundaries || !this.playingBuf) return [];
-    const currentTime = this.currentTime;
-    const boundaries = this.chunkBoundariesMap.get(this.playingIdx);
-    if (!boundaries) return [];
-    return boundaries.boundaries.filter((b) => b.offsetMs / 1000 <= currentTime);
-  }
-
-  /**
-   * Get the single active boundary at the current playback position.
-   * Returns the boundary whose time range contains the current playback time.
-   */
-  getActiveBoundary(): WordBoundary | null {
-    if (!this.playingBuf) return null;
-    const currentTime = this.currentTime;
-    const boundaries = this.chunkBoundariesMap.get(this.playingIdx);
-    if (!boundaries || boundaries.boundaries.length === 0) return null;
-    // Walk backwards to find the boundary containing currentTime
-    for (let i = boundaries.boundaries.length - 1; i >= 0; i--) {
-      const b = boundaries.boundaries[i];
-      if (currentTime >= b.offsetMs / 1000) return b;
-    }
-    return boundaries.boundaries[0];
-  }
-
-  /** Set word boundaries for a specific chunk index. */
-  setChunkBoundaries(index: number, boundaries: ChunkBoundaries): void {
-    this.chunkBoundariesMap.set(index, boundaries);
-  }
-
-  /* ── private ────────────────────────────────────────────────────────── */
-
-  private stopSource(): void {
-    if (this.source) {
-      try {
-        this.source.stop();
-      } catch {
-        /* */
-      }
-      this.source.disconnect();
-      this.source = null;
-    }
-  }
-
-  private scheduleNext(): void {
-    if (this.destroyed || this.state !== "playing") return;
-
-    // Check back-pressure: don't schedule more if we're too far ahead
-    if (this._decodedAheadSec > this.maxAheadSec) {
-      this.state = "buffering";
-      this.ev.onStateChange("buffering");
-      this.ev.onRebuffer?.();
-      this.waitForBuffer();
-      return;
-    }
-
-    // Find next chunk to schedule
-    let nextIdx = this.playingIdx + 1;
-    if (this.playingIdx === -1) nextIdx = 0;
-
-    for (const slot of this.pool.values()) {
-      if (slot.index >= nextIdx) {
-        this.scheduleSource(slot.index, slot.buffer, 0, this.playingRate);
-        return;
-      }
-    }
-
-    // No more buffers in pool — wait for decode
-    this.state = "buffering";
-    this.ev.onStateChange("buffering");
-    this.ev.onRebuffer?.();
-    this.waitForBuffer();
-  }
-
-  private scheduleSource(idx: number, buf: AudioBuffer, offset: number, r: number): void {
-    if (this.destroyed || !this.ctx) return;
-
-    const gen = this.scheduleGeneration;
-
-    const src = this.ctx.createBufferSource();
-    src.buffer = buf;
-    src.playbackRate.value = r;
-    src.connect(this.analyser ?? this.ctx.destination);
-
-    // Use nextStartTime for gapless scheduling (not ctx.currentTime)
-    const readOffset = Math.min(offset, buf.duration);
-    const startAt = Math.max(this.nextStartTime, this.ctx.currentTime + 0.03);
-    src.start(startAt, readOffset);
-    this.source = src;
-    this.sourceStartCtx = startAt;
-
-    this.playingBuf = buf;
-    this.playingIdx = idx;
-    this.playingOffset = offset;
-    this.playingRate = r;
-    this.nextIndex = Math.max(this.nextIndex, idx + 1);
-
-    // Update nextStartTime for the next chunk
-    const remainingDur = (buf.duration - readOffset) / r;
-    const gap = this.gapForIndex(idx);
-    this.nextStartTime = startAt + remainingDur + gap;
-
-    this.ev.onChunkChange?.(idx);
-    this.ev.onTimeUpdate?.(this.currentTime, this._totalDuration);
-
-    // Proactive scheduling: trigger scheduleNext BEFORE current source ends
-    // This eliminates the gap between chunks caused by onended event latency
-    const proactiveDelayMs = Math.max(30, Math.min(500, remainingDur * 0.7 * 1000));
-    setTimeout(() => {
-      if (this.destroyed || gen !== this.scheduleGeneration) return;
-      if (this.state === "playing") this.scheduleNext();
-    }, proactiveDelayMs);
-
-    // onended as fallback for document end detection and missed proactive timers
-    src.onended = () => {
-      if (this.destroyed || gen !== this.scheduleGeneration) return;
-
-      // Compute end position without mutating playingOffset (it will be
-      // reset by the next scheduleSource call)
-      const endPos = offset + (buf.duration - readOffset);
-      this.ev.onTimeUpdate?.(endPos, this._totalDuration);
-
-      const remaining = [...this.pool.values()].some((s) => s.index >= this.nextIndex);
-      if (!remaining) {
-        this.playingOffset = endPos;
-        this.state = "ended";
-        this.ev.onStateChange("ended");
-        return;
-      }
-      if (this.state === "playing") this.scheduleNext();
-    };
-
-    this.ev.onTimeUpdate?.(this.currentTime, this._totalDuration);
-  }
-
-  private waitForBuffer(): void {
+  private async decode(index: number, blob: Blob): Promise<void> {
+    await this.init();
+    const ctx = this.ctx;
+    if (!ctx || this.destroyed) return;
+    const raw = await ctx.decodeAudioData(await blob.arrayBuffer());
     if (this.destroyed) return;
-    const check = () => {
-      if (this.destroyed) return;
-      const next = [...this.pool.values()].find((s) => s.index >= this.nextIndex);
-      if (next) {
-        this._decodedAheadSec -= next.duration + this.gapForIndex(next.index);
-        if (this.state === "buffering") {
-          this.state = "playing";
-          this.ev.onStateChange("playing");
-        }
-        this.scheduleNext();
-        return;
-      }
-      requestAnimationFrame(check);
-    };
-    requestAnimationFrame(check);
+    const buffer = trimSilence(
+      ctx,
+      raw,
+      this.opts.silenceThresh,
+      this.opts.fadeMs,
+      this.opts.headPadMs,
+      this.opts.tailPadMs,
+    );
+    this.durations.set(index, buffer.duration);
+    if (!this.gaps.has(index)) {
+      const last = this.boundaries.get(index)?.boundaries.at(-1)?.word;
+      const gap = last
+        ? /[.!?\n]$/.test(last)
+          ? (this.opts.sectionGap ?? 0.4)
+          : /[,;:]$/.test(last)
+            ? (this.opts.sentenceGap ?? 0.1) * 0.5
+            : (this.opts.sentenceGap ?? 0.1)
+        : (this.opts.defaultGap ?? 0);
+      this.gaps.set(index, gap);
+    }
+    this.pool.set(index, buffer);
+    while (this.pool.size > (this.opts.maxDecodedBuffers ?? DEFAULT_MAX_BUFFERS)) {
+      // Sources retain their buffers independently until stopped/ended. Prefer
+      // evicting history; duration knowledge is never derived from residency.
+      const victim =
+        [...this.pool.keys()].find(
+          (i) => i !== index && ![...this.sources].some((s) => s.index === i),
+        ) ?? this.pool.keys().next().value;
+      if (victim === undefined) break;
+      this.pool.delete(victim);
+    }
+    if (this.intent) this.schedule();
   }
-
-  private setState(s: AudioEngineState): void {
-    if (this.state === s) return;
-    this.state = s;
-    this.ev.onStateChange(s);
+  private schedule(): void {
+    if (!this.intent || !this.ctx || this.destroyed) return;
+    const ctx = this.ctx;
+    // A decode or ended callback can arrive after the audible horizon. Resume
+    // from the frozen document position, never count the underrun as speech.
+    if (
+      this.state === "playing" &&
+      this.anchorDocument + (ctx.currentTime - this.anchorContext) * this.rate >
+        this.horizon
+    ) {
+      this.position = this.currentTime;
+      this.anchorContext = ctx.currentTime + 0.03;
+      this.anchorDocument = this.position;
+    }
+    if (this.sources.size === 0 && this.state === "buffering") {
+      this.anchorContext = ctx.currentTime + 0.03;
+      this.anchorDocument = this.position;
+      this.horizon = this.position;
+    }
+    while (
+      this.nextIndex < this.totalChunks &&
+      this.sources.size < (this.opts.maxDecodedBuffers ?? DEFAULT_MAX_BUFFERS)
+    ) {
+      if (
+        (this.horizon - this.currentTime) / this.rate >=
+        (this.opts.maxAheadSec ?? DEFAULT_MAX_AHEAD_SEC)
+      )
+        break;
+      const index = this.nextIndex;
+      const buffer = this.pool.get(index);
+      if (!buffer) break;
+      const start = this.chunkTime(index);
+      const offset = Math.max(0, this.position - start);
+      const when =
+        this.anchorContext +
+        (Math.max(start, this.position) - this.anchorDocument) / this.rate;
+      const node = ctx.createBufferSource();
+      const startAt = Math.max(ctx.currentTime, when);
+      // If even the safety lead was consumed, anchor subsequent nodes to the
+      // actual scheduled start. Otherwise the next source could overlap this one.
+      this.anchorContext += startAt - when;
+      node.buffer = buffer;
+      node.playbackRate.value = this.rate;
+      node.connect(ctx.destination);
+      const record = { node, index, endTime: start + buffer.duration };
+      const generation = this.generation;
+      this.sources.add(record);
+      this.nextIndex++;
+      this.horizon = record.endTime;
+      node.onended = () => {
+        node.disconnect();
+        if (
+          generation !== this.generation ||
+          this.destroyed ||
+          !this.sources.delete(record)
+        )
+          return;
+        this.position = Math.max(this.position, record.endTime);
+        this.update();
+        this.schedule();
+      };
+      node.start(startAt, Math.min(offset, buffer.duration));
+    }
+    if (this.sources.size) this.setState("playing");
+    else if (this.nextIndex >= this.totalChunks && this.totalChunks > 0) {
+      this.position = this.chunkTime(this.totalChunks);
+      this.intent = false;
+      this.setState("ended");
+    } else {
+      this.position = this.currentTime;
+      if (this.state !== "buffering") this.ev.onRebuffer?.();
+      this.setState("buffering");
+    }
+    this.update();
+  }
+  private gap(index: number): number {
+    return index === this.totalChunks - 1 ? 0 : (this.gaps.get(index) ?? 0);
+  }
+  /** UI observation; never uses a wall-clock timer as the playback clock. */
+  update(): void {
+    const time = this.currentTime;
+    const index = Math.min(this.totalChunks - 1, this.indexAt(time));
+    if (index >= 0 && index !== this.audibleIndex) {
+      this.audibleIndex = index;
+      this.ev.onChunkChange?.(index);
+    }
+    this.ev.onTimeUpdate?.(time, this.estimatedDuration);
+  }
+  setChunkBoundaries(index: number, boundaries: ChunkBoundaries): void {
+    this.boundaries.set(index, boundaries);
+  }
+  getCurrentWordBoundaries(): WordBoundary[] {
+    const index = this.indexAt(this.currentTime),
+      local = this.currentTime - this.chunkTime(index);
+    return (
+      this.boundaries.get(index)?.boundaries.filter((b) => b.offsetMs / 1000 <= local) ??
+      []
+    );
+  }
+  getActiveBoundary(): WordBoundary | null {
+    if (this.destroyed || this.state === "idle" || this.totalChunks === 0) return null;
+    const index = this.indexAt(this.currentTime),
+      local = this.currentTime - this.chunkTime(index);
+    return (
+      this.boundaries
+        .get(index)
+        ?.boundaries.find(
+          (b) => local >= b.offsetMs / 1000 && local < (b.offsetMs + b.durationMs) / 1000,
+        ) ?? null
+    );
+  }
+  private setState(state: AudioEngineState): void {
+    if (state === this.state) return;
+    this.state = state;
+    this.ev.onStateChange(state);
   }
 }

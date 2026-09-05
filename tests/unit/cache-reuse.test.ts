@@ -1,14 +1,6 @@
-/**
- * Cache reuse unit tests.
- *
- * Proves that the shared blob cache and global in-flight dedup prevent
- * duplicate TTS synthesis across play → export → export cycles.
- *
- * Scenario: play document → export WAV → export MP3 → export M4A → export MP3 again.
- * Assert: one synthesis per speech chunk maximum.
- *
- * Also tests concurrent: playback requesting chunk N + export requesting chunk N
- * → one provider request.
+/** Production blobFor fetch/cache tests and standalone acquireSynthesis tests.
+ * Repeated blob access models consumers, but does not invoke export encoders.
+ * Player controls plus blob reuse are covered in audio-timeline.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { BufferedSpeechPlayer, acquireSynthesis } from "@/lib/buffered-player";
@@ -74,7 +66,7 @@ function makeBlob(size = 64): Blob {
 
 /* ── Cache reuse: play → export → export ─────────────────────────────────── */
 
-describe("Cache reuse across play → export cycle", () => {
+describe("Cache reuse across repeated blobFor access", () => {
   it("blobFor returns the same blob from cache on repeated calls", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
@@ -165,7 +157,7 @@ describe("Cache reuse across play → export cycle", () => {
 
 /* ── Concurrent dedup: playback + export requesting same chunk ──────────── */
 
-describe("Concurrent in-flight dedup", () => {
+describe("acquireSynthesis helper in-flight dedup", () => {
   it("two simultaneous requests for the same cache key produce one fetch", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
@@ -215,7 +207,7 @@ describe("Concurrent in-flight dedup", () => {
 
 /* ── Export format does not affect cache identity ────────────────────────── */
 
-describe("Export format independence", () => {
+describe("Blob cache independence from playback rate", () => {
   it("changing playback rate does not invalidate the cache", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {

@@ -56,7 +56,11 @@ only from there onward to the configured TTS provider. With the default
 
 ## Quick start
 
-Requires Node ≥ 20.9. npm is the only supported package manager.
+Requires Node 24 LTS, minimum 24.15.0 (supported range: 24.x). npm is the only supported package manager.
+
+Use a 64-bit Node installation. Windows ia32 is unsupported: its optional locked
+Sharp binary requires Node 20, incompatible with the locked jsdom requirement.
+CI pins 24.15.0 and installs with `npm ci --engine-strict`.
 
 ```bash
 git clone <this-repo>

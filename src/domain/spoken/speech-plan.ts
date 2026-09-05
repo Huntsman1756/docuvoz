@@ -2,8 +2,8 @@ import type { SpeechChunk, SpokenPlan } from "./types";
 
 /**
  * Split a spoken plan into provider-sized chunks. Never cuts inside a
- * numeric word run: splits happen at sentence boundaries first, then commas,
- * then whitespace.
+ * numeric word run when a natural boundary exists: sentence, comma, whitespace,
+ * then a hard cut. Boundary whitespace is trimmed; hard cuts discard no text.
  */
 export const DEFAULT_MAX_CHUNK_CHARS = 400;
 /**
@@ -18,6 +18,8 @@ export function planChunks(
   maxChars: number = DEFAULT_MAX_CHUNK_CHARS,
   minChars = 0,
 ): SpeechChunk[] {
+  if (!Number.isInteger(maxChars) || maxChars < 2)
+    throw new RangeError("maxChars must be an integer >= 2");
   const chunks: SpeechChunk[] = [];
   let current = "";
   let currentSegments: string[] = [];
@@ -75,7 +77,14 @@ function splitLong(text: string, maxChars: number): string[] {
       lastBoundary(window, /[.!?…]\s+\S/) ??
       lastBoundary(window, /,\s+\S/) ??
       window.lastIndexOf(" ");
-    const end = cut === undefined ? maxChars : cut + 1;
+    let end = cut === undefined || cut < 0 ? maxChars : cut + 1;
+    // Keep surrogate pairs intact at a hard cut (UTF-16 character budget).
+    if (
+      end < rest.length &&
+      /[\uD800-\uDBFF]/.test(rest[end - 1]) &&
+      /[\uDC00-\uDFFF]/.test(rest[end])
+    )
+      end--;
     out.push(rest.slice(0, end).trim());
     rest = rest.slice(end).trimStart();
   }

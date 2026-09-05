@@ -202,9 +202,10 @@ async function main(): Promise<void> {
   const reports: DocReport[] = [];
 
   for (const entry of manifest.entries) {
-    if (entry.reference) {
-      reports.push(evaluate(loadReference(entry), "reference"));
-    }
+    // Product-only EPUB/DOCX samples have no research reference. Keep the
+    // historical PDF evaluation cohort identical to extraction/spoken runners.
+    if (!entry.reference) continue;
+    reports.push(evaluate(loadReference(entry), "reference"));
     const browserDoc = await extractWithBrowserPipeline(
       assetPath(entry.pdf),
       `browser-${entry.id}`,

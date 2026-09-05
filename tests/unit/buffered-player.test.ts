@@ -108,15 +108,21 @@ describe("BufferedSpeechPlayer: lifecycle", () => {
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
       if (url === "/api/speech") {
-        await new Promise((r) => setTimeout(r, 10));
         return makeSpeechResponse(makeBlob(64));
       }
       return makeHealthResponse();
     };
 
     const prepared: [number, number][] = [];
+    let complete!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
     const events = makeEvents({
-      onPreparedChange: (r, t) => prepared.push([r, t]),
+      onPreparedChange: (r, t) => {
+        prepared.push([r, t]);
+        if (r === t) complete();
+      },
       onStateChange: vi.fn(),
     });
 
@@ -124,7 +130,7 @@ describe("BufferedSpeechPlayer: lifecycle", () => {
       fetchImpl: fetchMock as never,
     });
     player.prepare();
-    await new Promise((r) => setTimeout(r, 100));
+    await completion;
 
     expect(player.preparedCount).toBe(3);
     expect(prepared.length).toBeGreaterThan(0);

@@ -166,10 +166,9 @@ export class BufferedSpeechPlayer {
 
   // Audio engine
   private engine: BufferedAudioEngine | null = null;
+  private pendingSeek: { epoch: number; autoplay: boolean } | null = null;
 
   // Blob queue for the engine
-  private blobQueue: { index: number; blob: Blob }[] = [];
-  private processingQueue = false;
 
   // Word boundaries per chunk (keyed by chunk.id)
   private chunkBoundaries = new Map<string, WordBoundary[]>();
@@ -234,13 +233,7 @@ export class BufferedSpeechPlayer {
    * extrapolates from the average decoded-buffer duration.
    */
   get estimatedDuration(): number {
-    if (!this.engine || this.chunks.length === 0) return 0;
-    const decoded = this.engine.decodedCount;
-    if (decoded === 0) return 0;
-    const decodedTotal = this.engine.totalDuration;
-    if (decoded >= this.chunks.length) return decodedTotal;
-    const avgPerChunk = decodedTotal / decoded;
-    return avgPerChunk * this.chunks.length;
+    return this.engine?.estimatedDuration ?? 0;
   }
   get elapsed(): number {
     return this.engine?.currentTime ?? 0;
@@ -270,72 +263,39 @@ export class BufferedSpeechPlayer {
   /* ── playback ───────────────────────────────────────────────────────── */
 
   async play(fromIndex?: number): Promise<void> {
-    if (this.destroyed) return;
-    const target = Math.min(
-      Math.max(0, fromIndex ?? Math.max(0, this.index)),
-      this.chunks.length - 1,
-    );
-    if (this.chunks.length === 0) return;
-    if (this.state === "loading" && this.index === target) return;
-
-    const epoch = ++this.epoch;
-    this.setState("loading");
-    this.index = target;
-    this.events.onChunkChange(target);
-
-    // Wait for the target chunk blob.
-    try {
-      await this.ensureBlob(this.chunks[target]);
-    } catch (error) {
-      if (epoch !== this.epoch || this.destroyed) return;
-      if (isAbortError(error)) return;
-      this.metrics.errors += 1;
-      this.emitMetrics();
-      this.setState("error");
-      this.events.onError(error instanceof Error ? error.message : "speech_error");
+    if (fromIndex === undefined && this.state === "paused") {
+      this.resume();
       return;
     }
-
-    if (epoch !== this.epoch || this.destroyed) return;
-
-    // Initialize engine and enqueue all blobs up to target.
-    await this.ensureEngine();
-    if (this.destroyed) return;
-
-    for (let i = 0; i <= target; i++) {
-      const blob = await this.ensureBlob(this.chunks[i]);
-      this.enqueueBlob(i, blob);
-    }
-
-    // Wait for at least the first buffer to be decoded.
-    await this.waitForBuffer(0);
-    if (this.destroyed) return;
-
-    // Seek to target position and start playing.
-    this.engine?.seek(this.getAccumulatedTime(target));
-    this.index = target;
-    this.events.onChunkChange(target);
-
-    // Start playback. This triggers engine scheduling and state transitions.
-    this.engine?.play();
+    await this.seekToChunk(fromIndex ?? Math.max(0, this.index), true);
   }
 
   pause(): void {
-    if (this.state === "playing" && this.engine) {
-      this.engine.pause();
-      this.setState("paused");
-    }
+    this.epoch++;
+    this.pendingSeek = null;
+    this.engine?.pause();
+    this.setState("paused");
   }
-
   resume(): void {
-    if (this.state === "paused" && this.engine) {
-      this.engine.resume();
-      this.setState("playing");
+    if (this.state !== "paused") return;
+    if (this.pendingSeek?.epoch === this.epoch) {
+      this.pendingSeek.autoplay = true;
+      this.setState("loading");
+      return;
     }
+    if (this.engine?.hasBuffer(Math.max(0, this.index))) {
+      this.engine.resume();
+      void this.fillAhead(this.epoch);
+    } else if (this.engine) {
+      const epoch = ++this.epoch;
+      this.pendingSeek = { epoch, autoplay: true };
+      void this.seekDecodedTime(this.engine.currentTime, true, epoch);
+    } else void this.seekToChunk(Math.max(0, this.index), true);
   }
 
   stop(): void {
     this.epoch += 1;
+    this.pendingSeek = null;
     this.engine?.stop();
     this.index = -1;
     this.setState("idle");
@@ -356,23 +316,33 @@ export class BufferedSpeechPlayer {
   }
 
   async seekToChunk(index: number, autoplay = this.state === "playing"): Promise<void> {
-    if (this.destroyed) return;
+    if (this.destroyed || !this.chunks.length) return;
     const target = Math.min(Math.max(0, index), this.chunks.length - 1);
-
+    const epoch = ++this.epoch;
+    const seek = { epoch, autoplay };
+    this.pendingSeek = seek;
+    this.engine?.pause();
+    this.setState(autoplay ? "loading" : "paused");
+    this.index = target;
+    this.events.onChunkChange(target);
     try {
-      await this.ensureBlob(this.chunks[target]);
-    } catch {
-      /* skip */
-    }
-
-    if (autoplay) {
-      await this.play(target);
-    } else {
-      this.index = target;
-      this.events.onChunkChange(target);
-      if (this.engine) {
-        this.engine.seek(this.getAccumulatedTime(target));
+      await this.ensureEngine();
+      // Prefix durations are source-time metadata, never inferred from pool size.
+      for (let i = 0; i <= target; i++) {
+        if (this.destroyed || epoch !== this.epoch) return;
+        const blob = await this.ensureBlob(this.chunks[i]);
+        if (this.destroyed || epoch !== this.epoch) return;
+        await this.engine?.enqueue(i, blob);
       }
+      if (this.destroyed || epoch !== this.epoch) return;
+      this.pendingSeek = null;
+      this.engine?.seek(this.getAccumulatedTime(target), seek.autoplay);
+      void this.fillAhead(epoch);
+    } catch (error) {
+      if (this.destroyed || epoch !== this.epoch || isAbortError(error)) return;
+      this.pendingSeek = null;
+      this.setState("error");
+      this.events.onError(error instanceof Error ? error.message : "speech_error");
     }
   }
 
@@ -386,7 +356,37 @@ export class BufferedSpeechPlayer {
 
   /** Seek by document time (seconds). Delegates to the audio engine. */
   seekByTime(time: number): void {
-    this.engine?.seek(time);
+    if (!this.engine || !Number.isFinite(time)) return;
+    const autoplay = this.state === "playing" || this.state === "buffering";
+    const epoch = ++this.epoch;
+    this.pendingSeek = { epoch, autoplay };
+    this.engine.pause();
+    void this.seekDecodedTime(Math.max(0, time), autoplay, epoch);
+  }
+
+  private async seekDecodedTime(
+    time: number,
+    autoplay: boolean,
+    epoch: number,
+  ): Promise<void> {
+    try {
+      for (let i = 0; i < this.chunks.length; i++) {
+        const blob = await this.ensureBlob(this.chunks[i]);
+        if (this.destroyed || epoch !== this.epoch) return;
+        await this.engine?.enqueue(i, blob);
+        if (this.destroyed || epoch !== this.epoch) return;
+        if ((this.engine?.chunkTime(i + 1) ?? 0) > time) break;
+      }
+      const play = this.pendingSeek?.autoplay ?? autoplay;
+      this.pendingSeek = null;
+      this.engine?.seek(time, play);
+      void this.fillAhead(epoch);
+    } catch (error) {
+      if (!this.destroyed && epoch === this.epoch && !isAbortError(error)) {
+        this.pendingSeek = null;
+        this.events.onError("seek_failed");
+      }
+    }
   }
 
   setPlaybackRate(rate: number): void {
@@ -437,8 +437,10 @@ export class BufferedSpeechPlayer {
           this.events.onTimeUpdate?.(t, d || this.estimatedDuration);
         },
         onChunkChange: (idx) => {
+          if (this.pendingSeek?.epoch === this.epoch) return;
           this.index = idx;
           this.events.onChunkChange(idx);
+          void this.fillAhead(this.epoch);
         },
         onError: (msg) => {
           this.metrics.errors += 1;
@@ -457,6 +459,11 @@ export class BufferedSpeechPlayer {
 
     // Eagerly initialize the AudioContext so enqueue() can work immediately.
     await this.engine.init();
+
+    // Tell the engine how many chunks exist so it can report end-of-document
+    // ("ended") instead of misclassifying the final chunk as a rebuffer.
+    this.engine.setTotalChunks(this.chunks.length);
+    this.engine.setPlaybackRate(this.playbackRate);
 
     // Propagate any already-collected word boundaries to the engine
     for (const [chunkId, boundaries] of this.chunkBoundaries) {
@@ -480,6 +487,8 @@ export class BufferedSpeechPlayer {
   private tickLoop(): void {
     if (!this.engine || this.destroyed) return;
 
+    this.engine.update();
+
     // Stop rebuffering once we're back to playing
     if (this._isRebuffering && this.engine.currentState === "playing") {
       this._isRebuffering = false;
@@ -491,64 +500,25 @@ export class BufferedSpeechPlayer {
     requestAnimationFrame(() => this.tickLoop());
   }
 
-  private enqueueBlob(index: number, blob: Blob): void {
-    this.blobQueue.push({ index, blob });
-    if (!this.processingQueue) void this.processQueue();
-  }
-
-  /** Wait until a specific buffer index is decoded by the engine. */
-  private waitForBuffer(index: number): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const timeout = setTimeout(() => resolve(), 10000); // 10s timeout
-      const check = () => {
-        if (this.destroyed) {
-          clearTimeout(timeout);
-          resolve();
-          return;
-        }
-        if (this.engine?.hasBuffer(index)) {
-          clearTimeout(timeout);
-          resolve();
-          return;
-        }
-        requestAnimationFrame(check);
-      };
-      check();
-    });
-  }
-
-  private async processQueue(): Promise<void> {
-    this.processingQueue = true;
-    while (this.blobQueue.length > 0 && !this.destroyed && this.engine) {
-      const item = this.blobQueue.shift()!;
-
-      // Check that we haven't exceeded the back-pressure budget
-      if (this.engine.currentState === "playing" && this.engine.decodedCount >= 6) {
-        // Wait for current buffers to finish playing before decoding more
-        await this.waitForBuffer(item.index);
-        if (this.destroyed) break;
-      }
-
-      await this.engine.enqueue(item.index, item.blob);
-
-      // Prefetch next chunks (bounded by prefetchDepth).
-      for (let d = 1; d <= this.prefetchDepth; d++) {
-        const ni = item.index + d;
-        if (ni >= this.chunks.length) break;
-        if (!this.engine.hasBuffer(ni)) {
-          try {
-            const b = await this.ensureBlob(this.chunks[ni]);
-            this.enqueueBlob(ni, b);
-          } catch {
-            /* prefetch failure — non-fatal */
-          }
-        }
+  private async fillAhead(epoch: number): Promise<void> {
+    const start = Math.max(0, this.index);
+    for (
+      let i = start;
+      i <= Math.min(this.chunks.length - 1, start + this.prefetchDepth);
+      i++
+    ) {
+      if (this.destroyed || epoch !== this.epoch) return;
+      try {
+        const blob = await this.ensureBlob(this.chunks[i]);
+        if (this.destroyed || epoch !== this.epoch) return;
+        await this.engine?.enqueue(i, blob);
+      } catch (error) {
+        if (!this.destroyed && epoch === this.epoch && !isAbortError(error))
+          this.events.onError("prefetch_failed");
+        return;
       }
     }
-    this.processingQueue = false;
   }
-
-  /* ── private: blob fetching ─────────────────────────────────────────── */
 
   private async ensureBlob(chunk: SpeechChunk): Promise<Blob> {
     const existing = this.blobs.get(chunk.id);

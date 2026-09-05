@@ -36,7 +36,7 @@ const EnvSchema = z.object({
   EDGE_TTS_VOICE: z.string().default("es-ES-XimenaNeural"),
   SPEECH_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
   SPEECH_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
-  SPEECH_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(120).default(20),
+  SPEECH_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(20),
   SPEECH_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(6).default(3),
   SPEECH_CACHE_DIR: z.string().default(".cache/audio"),
   SPEECH_MAX_TEXT_CHARS: z.coerce.number().int().min(50).max(4000).default(600),

@@ -123,13 +123,14 @@ describe("htmlAdapter: malicious HTML reaches the reader inert", () => {
     const doc = await htmlAdapter.load(file, { id: "sec-html", name: "malo.html" });
     const text = doc.blocks.map((b) => b.text).join("\n");
     expectNoRemoteUrls(text);
-    for (const leak of ["__pwned", "javascript", "<script", "onerror", "evil.invalid"]) {
+    for (const leak of ["__pwned", "javascript:", "<script", "onerror", "evil.invalid"]) {
       expect(text.toLowerCase(), `block text leaks ${leak}`).not.toContain(
         leak.toLowerCase(),
       );
     }
     expect(text).toContain("Documento legítimo por fuera");
     expect(text).toContain("Texto final que sí debe llegar al lector.");
+    expect(text).toContain("enlace javascript");
     expect(outboundCalls).toEqual([]);
   });
 

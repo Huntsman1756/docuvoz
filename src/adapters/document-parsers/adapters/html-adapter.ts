@@ -13,7 +13,7 @@ import type { DocumentAdapter, LoadOptions } from "../document-adapter";
 import type { StructuredDocument, DocumentBlock } from "@/domain/documents/types";
 
 const ADAPTER_ID = "html-dom";
-const ADAPTER_VERSION = "1.1.0";
+const ADAPTER_VERSION = "1.1.1";
 
 /**
  * DOMPurify config for local HTML documents.
@@ -97,10 +97,6 @@ const HEADING_LEVELS: Record<string, number> = {
   h6: 6,
 };
 
-/** Nested block-level elements: outer containers must not duplicate them. */
-const BLOCK_SELECTOR =
-  "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, td, th, figcaption, caption, dt, dd";
-
 export const htmlAdapter: DocumentAdapter = {
   id: ADAPTER_ID,
   formats: ["html"],
@@ -137,7 +133,7 @@ export const htmlAdapter: DocumentAdapter = {
     removeNoiseElements(doc);
 
     // Extract blocks (every container is recursed — nothing is dropped)
-    const contentRoot = doc.querySelector("article, main, [role='main']") ?? doc.body;
+    const contentRoot = doc.body;
     const blocks = extractBlocks(contentRoot ?? doc.body);
 
     if (blocks.length === 0) {
@@ -198,128 +194,77 @@ interface ExtractState {
   blocks: DocumentBlock[];
 }
 
+/** A depth-first childNodes walk owns each text node exactly once. Inline
+ * nodes inherit the current owner; structural boundaries flush text in order.
+ * Paragraphs inside lists/quotes/cells retain that enclosing semantic type. */
 function extractBlocks(root: Element): DocumentBlock[] {
   const state: ExtractState = { order: 0, blocks: [] };
-  let index = 0;
-  for (const el of Array.from(root.children)) {
-    collectFromElement(el, state, 0, `${root.tagName.toLowerCase()}>${index++}`);
-  }
-  // Fallback: leaf documents (e.g. <body>Text only</body>)
-  if (state.blocks.length === 0) {
-    const text = elementText(root, true);
-    if (text) {
-      state.blocks.push({
-        id: "b0",
-        type: "paragraph",
-        text,
-        page: 1,
-        order: 0,
-        sourceRef: "html:fallback",
-      });
+  type Owner = {
+    type: DocumentBlock["type"];
+    level?: number;
+    listLevel?: number;
+    path: string;
+  };
+  let text = "";
+  let active: Owner = { type: "paragraph", path: "body" };
+  const flush = () => {
+    pushBlock(state, active.type, text.replace(/\s+/g, " "), active);
+    text = "";
+  };
+  const visit = (node: Node, owner: Owner, path: string, depth: number) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (active !== owner) flush();
+      active = owner;
+      text += node.nodeValue ?? "";
+      return;
     }
-  }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as Element;
+    const tag = el.tagName.toLowerCase();
+    if (["script", "style", "noscript", "iframe", "object", "form"].includes(tag)) return;
+    if (tag === "br") {
+      text += "\n";
+      return;
+    }
+    if (tag === "img") {
+      const alt = el.getAttribute("alt")?.trim();
+      if (alt) {
+        if (active !== owner) flush();
+        active = owner;
+        text += ` [Imagen: ${alt}] `;
+      }
+      return;
+    }
+    const structural =
+      /^(body|div|section|article|main|p|h[1-6]|ul|ol|li|dl|dt|dd|table|thead|tbody|tr|td|th|blockquote|pre|figure|figcaption|caption|hr)$/.test(
+        tag,
+      );
+    let next = owner;
+    if (structural) {
+      flush();
+      let type: DocumentBlock["type"] = owner.type;
+      if (tag in HEADING_LEVELS) type = "heading";
+      else if (["li", "dt", "dd"].includes(tag)) type = "list-item";
+      else if (["td", "th"].includes(tag)) type = "table-cell";
+      else if (tag === "blockquote") type = "quote";
+      else if (tag === "pre") type = "code";
+      else if (["figcaption", "caption"].includes(tag)) type = "caption";
+      next = {
+        type,
+        path,
+        level: HEADING_LEVELS[tag],
+        listLevel: type === "list-item" ? Math.max(0, depth - 1) : undefined,
+      };
+    }
+    const childDepth = depth + (tag === "ul" || tag === "ol" ? 1 : 0);
+    Array.from(el.childNodes).forEach((child, i) =>
+      visit(child, next, `${path}>${tag}[${i}]`, childDepth),
+    );
+    if (structural) flush();
+  };
+  visit(root, active, "body", 0);
+  flush();
   return state.blocks;
-}
-
-function collectFromElement(
-  el: Element,
-  state: ExtractState,
-  listDepth: number,
-  path: string,
-): void {
-  const tag = el.tagName.toLowerCase();
-
-  if (tag in HEADING_LEVELS) {
-    pushBlock(state, "heading", elementText(el, true), {
-      level: HEADING_LEVELS[tag],
-      path,
-    });
-    return;
-  }
-
-  switch (tag) {
-    case "table": {
-      let col = 0;
-      for (const cell of Array.from(el.querySelectorAll("th, td"))) {
-        const isHeader = cell.tagName.toLowerCase() === "th";
-        pushBlock(state, "table-cell", elementText(cell, true), {
-          path: `${path}>cell[${col++}]${isHeader ? "#h" : ""}`,
-        });
-      }
-      return;
-    }
-    case "ul":
-    case "ol": {
-      let index = 0;
-      for (const child of Array.from(el.children)) {
-        if (child.tagName.toLowerCase() !== "li") continue;
-        collectListItem(child, state, listDepth, `${path}>li[${index++}]`);
-      }
-      return;
-    }
-    case "dl": {
-      let index = 0;
-      for (const child of Array.from(el.children)) {
-        const childTag = child.tagName.toLowerCase();
-        if (childTag !== "dt" && childTag !== "dd") continue;
-        pushBlock(state, "list-item", elementText(child, true), {
-          listLevel: listDepth,
-          path: `${path}>${childTag}[${index++}]`,
-        });
-      }
-      return;
-    }
-    case "blockquote": {
-      pushBlock(state, "quote", elementText(el, true), { path });
-      return;
-    }
-    case "pre":
-    case "code": {
-      pushBlock(state, "code", elementText(el, true), { path });
-      return;
-    }
-    case "li": {
-      collectListItem(el, state, listDepth, path);
-      return;
-    }
-    case "figcaption":
-    case "caption": {
-      pushBlock(state, "caption", elementText(el, true), { path });
-      return;
-    }
-    case "p": {
-      pushBlock(state, "paragraph", paragraphText(el), { path });
-      return;
-    }
-    default: {
-      // Generic container (div/section/article/span…): recurse in order.
-      let index = 0;
-      for (const child of Array.from(el.children)) {
-        collectFromElement(child, state, listDepth, `${path}>${tag}[${index++}]`);
-      }
-      // Leaf containers with only text (rare post-sanitize) are handled by
-      // the block-level branches above; nothing to emit here.
-      return;
-    }
-  }
-}
-
-function collectListItem(
-  li: Element,
-  state: ExtractState,
-  listDepth: number,
-  path: string,
-): void {
-  pushBlock(state, "list-item", elementText(li, true), {
-    listLevel: listDepth,
-    path,
-  });
-  for (const child of Array.from(li.children)) {
-    const childTag = child.tagName.toLowerCase();
-    if (childTag === "ul" || childTag === "ol") {
-      collectFromElement(child, state, listDepth + 1, `${path}>${childTag}`);
-    }
-  }
 }
 
 function pushBlock(
@@ -341,46 +286,4 @@ function pushBlock(
     sourceRef: `html:${extra.path}`,
   });
   state.order++;
-}
-
-/**
- * Text of `el`; when `excludeNestedBlocks` is set, text owned by nested
- * block-level descendants is skipped (it is emitted as its own block).
- */
-function elementText(el: Element, excludeNestedBlocks: boolean): string {
-  const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const parent = node.parentElement;
-      if (!parent) return NodeFilter.FILTER_REJECT;
-      const t = parent.tagName.toLowerCase();
-      if (["script", "style", "noscript"].includes(t)) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      if (excludeNestedBlocks) {
-        const nearest = parent.closest(BLOCK_SELECTOR);
-        if (nearest && nearest !== el && el.contains(nearest)) {
-          return NodeFilter.FILTER_REJECT;
-        }
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-  const texts: string[] = [];
-  let node;
-  while ((node = walker.nextNode())) {
-    const text = node.textContent?.trim();
-    if (text) texts.push(text);
-  }
-  if (texts.length === 0) return imageAltFallback(el);
-  return texts.join(" ");
-}
-
-function paragraphText(el: Element): string {
-  return elementText(el, true) || imageAltFallback(el);
-}
-
-function imageAltFallback(el: Element): string {
-  const img = el.matches("img") ? el : el.querySelector("img[alt]");
-  const alt = img?.getAttribute("alt")?.trim();
-  return alt ? `[Imagen: ${alt}]` : "";
 }

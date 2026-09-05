@@ -1,33 +1,6 @@
-/**
- * BufferedSpeechPlayer — comprehensive test suite (fetch/cache layer).
- *
- * These tests exercise the blob-fetching, caching, dedup, and abort layers
- * without triggering Web Audio (AudioContext is not available in vitest/node).
- *
- * Web Audio integration (play, pause, resume, seek, word boundaries) is
- * covered by the E2E suite (Playwright).
- *
- * Covers:
- *  1. Next chunk is prepared before current ends (fetch layer)
- *  2. Scheduled chunks do not overlap (fetch order)
- *  3. Pause preserves position (state machine)
- *  4. Resume continues from correct position (state machine)
- *  5. Seek invalidates stale scheduled audio (state machine)
- *  6. Speed change does not generate another TTS request
- *  7. Document switch cancels previous schedule
- *  8. Voice change invalidates correct cache identity
- *  9. Same request in-flight is deduplicated
- *  10. AbortError remains silent
- *  11. Real provider error still surfaces
- *  12. End of document transitions cleanly (state machine)
- *  13. Word boundary follows playback clock (metadata layer)
- *  14. Fallback highlighting works without boundaries
- *  15. Long document keeps bounded memory/buffer
- *  16. Replay from persisted cache works without synthesis
- *  17. First-fill is represented as buffering, not error
- *  18. Mid-stream rebuffer recovers
- *  19. Rapid Play/Pause does not duplicate audio
- *  20. Export and playback do not corrupt each other's state
+/** Fetch/cache and idle-state production tests. These do not run Web Audio.
+ * Real scheduling, playback clock and lifecycle assertions live in
+ * audio-timeline.test.ts. Narrow checks here must not claim audio guarantees.
  */
 import { describe, expect, it } from "vitest";
 import { BufferedSpeechPlayer } from "@/lib/buffered-player";
@@ -128,8 +101,8 @@ function createFetchMock(opts?: { latencyMs?: number; blobSize?: number }) {
 
 /* ── 1. Next chunk is prepared before current ends ──────────────────────── */
 
-describe("Test 1: Next chunk prepared before current ends", () => {
-  it("prefetchDepth=2 means chunks 1 and 2 are ready while chunk 0 plays", async () => {
+describe("Preparation fetch completion", () => {
+  it("prepare fetches all five chunks without playback", async () => {
     let fetchCount = 0;
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
@@ -162,7 +135,7 @@ describe("Test 1: Next chunk prepared before current ends", () => {
 
 /* ── 2. Scheduled chunks do not overlap incorrectly ─────────────────────── */
 
-describe("Test 2: Scheduled chunks do not overlap", () => {
+describe("Preparation request ordering", () => {
   it("prepare processes chunks in order", async () => {
     let fetchCount = 0;
     const order: number[] = [];
@@ -197,7 +170,7 @@ describe("Test 2: Scheduled chunks do not overlap", () => {
 
 /* ── 3. Pause preserves position ──────────────────────────────────────── */
 
-describe("Test 3: Pause preserves position", () => {
+describe("Pause called without active audio", () => {
   it("state transitions are correct for pause", async () => {
     const fetchMock = createFetchMock({ latencyMs: 5, blobSize: 64 });
 
@@ -226,7 +199,7 @@ describe("Test 3: Pause preserves position", () => {
 
 /* ── 4. Resume continues from correct position ────────────────────────── */
 
-describe("Test 4: Resume continues from correct position", () => {
+describe("Resume without active audio", () => {
   it("resume when not paused is safe (no-op)", async () => {
     const fetchMock = createFetchMock({ latencyMs: 5, blobSize: 64 });
 
@@ -248,7 +221,7 @@ describe("Test 4: Resume continues from correct position", () => {
 
 /* ── 5. Seek invalidates stale scheduled audio correctly ────────────────── */
 
-describe("Test 5: Seek invalidates stale scheduled audio", () => {
+describe("Seek index selection", () => {
   it("seekToChunk without autoplay updates index", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
@@ -317,7 +290,7 @@ describe("Test 6: Speed change does not generate TTS requests", () => {
 
 /* ── 7. Document switch cancels previous schedule ───────────────────────── */
 
-describe("Test 7: Document switch cancels previous schedule", () => {
+describe("Destroy during preparation", () => {
   it("destroy during prepare does not leak AbortError", async () => {
     let errorCalled = false;
     const fetchMock = async (input: string | URL | Request, init?: RequestInit) => {
@@ -523,7 +496,7 @@ describe("Test 11: Real errors surface", () => {
 
 /* ── 12. End of document transitions cleanly ────────────────────────────── */
 
-describe("Test 12: Document end transitions cleanly", () => {
+describe("Preparation completes", () => {
   it("prepare completes with all chunks ready", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
@@ -557,7 +530,7 @@ describe("Test 12: Document end transitions cleanly", () => {
 
 /* ── 13. Word boundary follows playback clock ───────────────────────────── */
 
-describe("Test 13: Word boundary follows playback clock", () => {
+describe("Provider capability exposure", () => {
   it("player exposes supportsWordBoundaries from provider metadata", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
@@ -586,8 +559,8 @@ describe("Test 13: Word boundary follows playback clock", () => {
 
 /* ── 14. Fallback highlighting works without boundaries ─────────────────── */
 
-describe("Test 14: Fallback highlighting without boundaries", () => {
-  it("chunk-level tracking works when word boundaries are absent", async () => {
+describe("Initial chunk metadata", () => {
+  it("initial chunk selection is unset without playback", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
@@ -619,7 +592,7 @@ describe("Test 14: Fallback highlighting without boundaries", () => {
 
 /* ── 15. Long document keeps bounded memory/buffer ──────────────────────── */
 
-describe("Test 15: Long document bounded memory", () => {
+describe("Large chunk list construction", () => {
   it("500 chunks does not crash the player", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
@@ -688,8 +661,8 @@ describe("Test 16: Replay from cache works", () => {
 
 /* ── 17. First-fill is buffering, not error ─────────────────────────────── */
 
-describe("Test 17: First-fill is buffering not error", () => {
-  it("initial load shows buffering state, not error", async () => {
+describe("Preparation without playback", () => {
+  it("prepare does not report a provider error", async () => {
     let errorCalled = false;
     const stateChanges: string[] = [];
     const events = makeEvents({
@@ -720,7 +693,7 @@ describe("Test 17: First-fill is buffering not error", () => {
 
 /* ── 18. Mid-stream rebuffer recovers ───────────────────────────────────── */
 
-describe("Test 18: Mid-stream rebuffer recovers", () => {
+describe("Preparation failure handling", () => {
   it("player survives a mix of successful and failed fetches", async () => {
     let fetchCount = 0;
     const shouldFail = true;
@@ -870,8 +843,8 @@ describe("BufferedAudioEngine: capabilities", () => {
 
 /* ── Gapless scheduling tests ────────────────────────────────────────────── */
 
-describe("BufferedAudioEngine: gapless scheduling", () => {
-  it("scheduleSource uses nextStartTime for gapless transitions", async () => {
+describe("BufferedAudioEngine: idle lifecycle", () => {
+  it("construct and destroy leave the engine idle", async () => {
     const stateChanges: string[] = [];
     const mockEvents: import("@/lib/buffered-audio-engine").AudioEngineEvents = {
       onStateChange: (s) => stateChanges.push(s),
@@ -887,7 +860,7 @@ describe("BufferedAudioEngine: gapless scheduling", () => {
     expect(engine.currentState).toBe("idle");
   });
 
-  it("scheduleGeneration increments on seek/pause/stop invalidate timers", async () => {
+  it("destroying an unused engine remains idle", async () => {
     const mockEvents: import("@/lib/buffered-audio-engine").AudioEngineEvents = {
       onStateChange: () => {},
     };

@@ -5,7 +5,8 @@
  */
 import { expect, test } from "@playwright/test";
 
-test("Edge TTS/Ximena: playback smoke test", async ({ page }) => {
+test("Edge TTS/Ximena: playback smoke test @live", async ({ page }) => {
+  test.skip(!process.env.E2E_LIVE, "run with E2E_LIVE=1 (real Edge/Ximena)");
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (err) => errors.push(err.message));
@@ -38,11 +39,12 @@ test("Edge TTS/Ximena: playback smoke test", async ({ page }) => {
 
   // Resume
   await transportPause.click();
-  await page.waitForTimeout(500);
+  // Wait for real playback to resume (❚❚ = playing), not wall-clock.
+  await expect(transportPause).toHaveText("❚❚", { timeout: 30_000 });
 
-  // Change speed
+  // Change speed — wait for the transport rate label to reflect it.
   await page.getByLabel("velocidad de reproducción").selectOption("1.5");
-  await page.waitForTimeout(500);
+  await expect(page.locator(".reader-transport-rate")).toHaveText("1.5×");
 
   // Verify still in a valid state
   const phase = await page.locator("main").getAttribute("data-phase");

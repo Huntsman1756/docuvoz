@@ -161,7 +161,11 @@ function hasRealAudio(buf: Buffer): boolean {
 
 /* ── Tests ───────────────────────────────────────────────────────────── */
 
-test.describe("Live Edge/Ximena export checkpoint", () => {
+test.describe("Live Edge/Ximena export checkpoint @live", () => {
+  test.skip(
+    !process.env.E2E_LIVE,
+    "Live provider smoke — run with E2E_LIVE=1 (real Edge/Ximena network)",
+  );
   test.setTimeout(300_000);
 
   test("full export smoke: WAV, MP3, M4A with duration/metadata/cache/WASM checks", async ({
@@ -200,8 +204,21 @@ test.describe("Live Edge/Ximena export checkpoint", () => {
       { timeout: 60_000 },
     );
 
-    // Wait a bit more so additional chunks are synthesized in the background.
-    await page.waitForTimeout(10_000);
+    // Wait until playback advances past the first chunk boundary (currentTime
+    // > 3 s), proving real multi-chunk audio is playing rather than a single
+    // cached blob — this replaces a fixed background-synthesis sleep.
+    await page.waitForFunction(
+      () => {
+        const timeEl = document.querySelector('[aria-label="tiempo"]');
+        if (!timeEl) return false;
+        const text = timeEl.textContent ?? "";
+        const match = text.match(/(\d+):(\d+)\s*\/\s*(\d+):(\d+)/);
+        if (!match) return false;
+        const current = parseInt(match[1]) * 60 + parseInt(match[2]);
+        return current > 3;
+      },
+      { timeout: 120_000 },
+    );
 
     // Pause to stop playback.
     const pauseBtn = page.getByRole("button", { name: /Pausar/ });
