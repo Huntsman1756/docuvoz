@@ -6,8 +6,17 @@ import type { StructuredDocument } from "@/domain/documents/types";
 import type { GoldEntry, SpokenPlan, SpokenSegment } from "@/domain/spoken/types";
 import { buildGoldPlan, buildSpokenPlan } from "@/domain/spoken/pipeline";
 import { planChunks } from "@/domain/spoken/speech-plan";
-import { extractPdf, sha256Hex } from "@/adapters/document-parsers/browser-loader";
-import { hasPdfMagic, validatePdfFile } from "@/lib/ingest";
+import {
+  resolveAdapter,
+  SUPPORTED_EXTENSIONS,
+  SUPPORTED_FORMATS_LABEL,
+} from "@/adapters/document-parsers/adapter-registry";
+import { validateDocumentFile } from "@/lib/ingest";
+import {
+  getParserDiagnostics,
+  clearParserDiagnostics,
+  type ParserDiagnostic,
+} from "@/lib/diagnostics";
 import {
   SpeechPlayer,
   type HealthDescriptor,
@@ -45,8 +54,14 @@ export function Lab() {
   const [metrics, setMetrics] = useState<PlayerMetrics | null>(null);
   const [chunkIndex, setChunkIndex] = useState(0);
   const [rate, setRate] = useState(1);
+  const [diagnostics, setDiagnostics] = useState<ParserDiagnostic[]>([]);
   const playerRef = useRef<SpeechPlayer | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const refreshDiagnostics = useCallback(
+    () => setDiagnostics(getParserDiagnostics()),
+    [],
+  );
 
   useEffect(() => {
     void loadManifest()
@@ -54,9 +69,13 @@ export function Lab() {
       .catch(() => setCorpus(null));
     fetch("/api/health")
       .then((r) => r.json() as Promise<HealthDescriptor & { ok: boolean }>)
-      .then(setHealth)
+      .then((h) => {
+        setHealth(h);
+        // Pick up diagnostics persisted by a previous parse in this session.
+        refreshDiagnostics();
+      })
       .catch(() => setHealth(null));
-  }, []);
+  }, [refreshDiagnostics]);
 
   const plan: SpokenPlan | null = useMemo(() => {
     if (!doc) return null;
@@ -90,53 +109,63 @@ export function Lab() {
     return () => player.destroy();
   }, [chunks]);
 
-  const openPdf = useCallback(async (data: ArrayBuffer, name: string) => {
-    setPhase("extracting");
-    setErrorText(null);
-    setStatusText("extracting text client-side…");
-    try {
-      const hash = await sha256Hex(data);
-      const extracted = await extractPdf(data, {
-        id: `doc-${hash.slice(0, 12)}`,
-        name,
-        sha256: hash,
-      });
-      setDoc(extracted);
-      setDocSource("pdf");
-      setGoldEntries(null);
-      setFixtureId(null);
-      setMode("listen");
-      setPhase("ready");
-      setSelected(null);
-      setStatusText(
-        `${extracted.blocks.length} blocks on ${extracted.source.pageCount} pages`,
-      );
-    } catch (error) {
-      setPhase("error");
-      setErrorText(
-        `extraction failed: ${error instanceof Error ? error.message : "unknown"}. ` +
-          "Scanned (image-only) PDFs yield no text with the browser extractor.",
-      );
-    }
-  }, []);
+  const analyzeFile = useCallback(
+    async (file: File) => {
+      setPhase("extracting");
+      setErrorText(null);
+      setStatusText("extracting text client-side…");
+      try {
+        const resolved = await resolveAdapter(file);
+        if (!resolved) {
+          setPhase("error");
+          setErrorText(
+            `Formato no soportado: "${file.name}". Formatos aceptados: ${SUPPORTED_FORMATS_LABEL}.`,
+          );
+          return;
+        }
+        const { adapter } = resolved;
+        const extracted = await adapter.load(file, {
+          id: `doc-${file.name}-${Date.now()}`,
+          name: file.name,
+        });
+        setDoc(extracted);
+        setDocSource("pdf");
+        setGoldEntries(null);
+        setFixtureId(null);
+        setMode("listen");
+        setPhase("ready");
+        setSelected(null);
+        setStatusText(
+          `${extracted.blocks.length} blocks on ${extracted.source.pageCount ?? extracted.blocks.length} sections`,
+        );
+      } catch (error) {
+        setPhase("error");
+        const msg = error instanceof Error ? error.message : "unknown";
+        setErrorText(`No se pudo leer el documento: ${msg}`);
+      } finally {
+        refreshDiagnostics();
+      }
+    },
+    [refreshDiagnostics],
+  );
 
   const onFile = useCallback(
     async (file: File) => {
-      const invalid = validatePdfFile(file);
+      const invalid = validateDocumentFile(file);
       if (invalid) {
         setPhase("error");
-        setErrorText(`rejected: ${invalid}`);
+        setErrorText(
+          invalid === "file_too_large"
+            ? "rejected: file_too_large"
+            : invalid === "empty_file"
+              ? "rejected: empty_file"
+              : `Formato no soportado: ${SUPPORTED_FORMATS_LABEL}`,
+        );
         return;
       }
-      const buffer = await file.arrayBuffer();
-      if (!hasPdfMagic(new Uint8Array(buffer))) {
-        setPhase("error");
-        setErrorText("rejected: not a PDF (bad magic)");
-        return;
-      }
-      await openPdf(buffer, file.name);
+      await analyzeFile(file);
     },
-    [openPdf],
+    [analyzeFile],
   );
 
   const loadFixture = useCallback(
@@ -168,7 +197,10 @@ export function Lab() {
         setStatusText(`fetching fixture ${entry.pdf}…`);
         const res = await fetch(entry.pdf);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        await openPdf(await res.arrayBuffer(), `${entry.id}.pdf`);
+        const blob = await res.blob();
+        const ext = entry.pdf.match(/\.[^.]+$/)?.[0] ?? ".pdf";
+        const file = new File([blob], `${entry.id}${ext}`, { type: blob.type });
+        await analyzeFile(file);
         setFixtureId(entry.id);
       } catch (error) {
         setPhase("error");
@@ -177,7 +209,7 @@ export function Lab() {
         );
       }
     },
-    [corpus, openPdf],
+    [corpus, analyzeFile],
   );
 
   const playPause = useCallback(() => {
@@ -241,7 +273,7 @@ export function Lab() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept={SUPPORTED_EXTENSIONS}
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -254,10 +286,10 @@ export function Lab() {
             className="primary"
             onClick={() => fileInputRef.current?.click()}
           >
-            Select PDF
+            Select document
           </button>
           <span className="hint">
-            or drag a PDF here · parsed 100% in your browser · max 25 MB
+            {SUPPORTED_FORMATS_LABEL} · parsed 100% in your browser · max 50 MB
           </span>
         </div>
         {corpus && corpus.entries.length > 0 && (
@@ -301,6 +333,36 @@ export function Lab() {
         <div className="status error" role="alert">
           ✖ {errorText}
         </div>
+      )}
+
+      {diagnostics.length > 0 && (
+        <section
+          className="panel"
+          data-testid="parser-diagnostics"
+          aria-label="diagnósticos del parser"
+        >
+          <div className="status">
+            🧾 parser diagnostics ({diagnostics.length})
+            <button
+              type="button"
+              className="chip"
+              style={{ marginLeft: 8 }}
+              onClick={() => {
+                clearParserDiagnostics();
+                refreshDiagnostics();
+              }}
+            >
+              clear
+            </button>
+          </div>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 20, fontSize: "0.85rem" }}>
+            {diagnostics.slice(-20).map((d, i) => (
+              <li key={i} data-diag-level={d.level}>
+                <code>{d.source}</code> · {d.level} · {d.message}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {plan && doc && (

@@ -58,6 +58,7 @@ function collectGoldenRows(): PacketRow[] {
 function collectCorpusRows(): PacketRow[] {
   const rows: PacketRow[] = [];
   for (const entry of loadManifest().entries) {
+    if (!entry.reference) continue; // reader-sample fixtures (EPUB/DOCX) have no eval reference
     const plan = buildSpokenPlan(loadReference(entry), "listen");
     for (const segment of plan.segments) {
       if (

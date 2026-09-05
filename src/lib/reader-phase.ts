@@ -21,7 +21,7 @@ export type ReaderPhase =
 /** User-facing label for every reader phase. */
 export const PHASE_LABELS: Record<ReaderPhase, string> = {
   empty: "",
-  loading: "Cargando PDF…",
+  loading: "Cargando documento…",
   extracting: "Analizando documento…",
   preparing: "Preparando audio…",
   ready: "Listo para escuchar",

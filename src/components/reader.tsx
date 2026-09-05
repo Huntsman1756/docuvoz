@@ -6,8 +6,13 @@ import type { StructuredDocument } from "@/domain/documents/types";
 import type { SpokenMode } from "@/domain/spoken/types";
 import { buildSpokenPlan } from "@/domain/spoken/pipeline";
 import { planChunks } from "@/domain/spoken/speech-plan";
-import { extractPdf, sha256Hex } from "@/adapters/document-parsers/browser-loader";
-import { hasPdfMagic, validatePdfFile } from "@/lib/ingest";
+import {
+  resolveAdapter,
+  SUPPORTED_EXTENSIONS,
+  SUPPORTED_FORMATS_LABEL,
+} from "@/adapters/document-parsers/adapter-registry";
+import { validateDocumentFile } from "@/lib/ingest";
+import type { TocEntry } from "@/domain/documents/types";
 import { BufferedSpeechPlayer } from "@/lib/buffered-player";
 import type { BufferedPlayerState } from "@/lib/buffered-player";
 import type { EngineDescriptor } from "@/lib/speech-player";
@@ -70,6 +75,7 @@ export function Reader() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [advanced, setAdvanced] = useState(false);
+  const [showToc, setShowToc] = useState(false);
 
   const playerRef = useRef<BufferedSpeechPlayer | null>(null);
   const genRef = useRef(0);
@@ -109,6 +115,19 @@ export function Reader() {
     ? voice
     : defaultVoice(effLang, engineId);
 
+  /* ---- format label ---- */
+  const formatLabel = useMemo(() => {
+    if (!doc) return "";
+    const parser = doc.parser;
+    if (parser.includes("pdf")) return "PDF";
+    if (parser.includes("epub")) return "EPUB";
+    if (parser.includes("docx")) return "DOCX";
+    if (parser.includes("markdown")) return "Markdown";
+    if (parser.includes("html")) return "HTML";
+    if (parser.includes("txt")) return "TXT";
+    return doc.source.name.split(".").pop()?.toUpperCase() ?? "";
+  }, [doc]);
+
   /* ---- spoken plan & chunks ---- */
   const plan = useMemo(() => (doc ? buildSpokenPlan(doc, mode) : null), [doc, mode]);
   const chunks = useMemo(
@@ -125,6 +144,39 @@ export function Reader() {
   const totalChars = useMemo(
     () => chunks.reduce((n, c) => n + c.text.length, 0),
     [chunks],
+  );
+
+  /* ---- TOC navigation ---- */
+  const toc = doc?.toc;
+  const activeTocIndex = useMemo(() => {
+    if (!toc || !plan) return -1;
+    const seg = plan.segments.find((s) => chunks[chunkIndex]?.segmentIds.includes(s.id));
+    if (!seg) return -1;
+    const blockOrder =
+      seg.provenance.blockIds.length > 0
+        ? (doc?.blocks.find((b) => b.id === seg.provenance.blockIds[0])?.order ?? -1)
+        : -1;
+    let best = -1;
+    for (let i = 0; i < toc.length; i++) {
+      if (toc[i].blockIndex <= blockOrder) best = i;
+    }
+    return best;
+  }, [toc, plan, chunks, chunkIndex, doc]);
+
+  const navigateToToc = useCallback(
+    (entry: TocEntry) => {
+      if (!plan || !chunks) return;
+      const block = doc?.blocks.find((b) => b.order === entry.blockIndex);
+      if (!block) return;
+      const seg = plan.segments.find((s) => s.provenance.blockIds.includes(block.id));
+      if (!seg) return;
+      const chunkIdx = chunks.findIndex((c) => c.segmentIds.includes(seg.id));
+      if (chunkIdx >= 0) {
+        void playerRef.current?.seekToChunk(chunkIdx);
+      }
+      setShowToc(false);
+    },
+    [plan, chunks, doc],
   );
 
   /* ---- player lifecycle ---- */
@@ -213,16 +265,24 @@ export function Reader() {
     return gen;
   }, []);
 
-  const analyzeBytes = useCallback(
-    async (data: ArrayBuffer, name: string, gen: number) => {
+  const analyzeFile = useCallback(
+    async (file: File, gen: number) => {
       if (gen !== genRef.current) return;
       setRawPhase("extracting");
       try {
-        const hash = await sha256Hex(data);
-        const extracted = await extractPdf(data, {
-          id: `doc-${hash.slice(0, 12)}`,
-          name,
-          sha256: hash,
+        const resolved = await resolveAdapter(file);
+        if (!resolved) {
+          if (gen !== genRef.current) return;
+          setRawPhase("error");
+          setErrorText(
+            `Formato no soportado: "${file.name}". Formatos aceptados: ${SUPPORTED_FORMATS_LABEL}.`,
+          );
+          return;
+        }
+        const { adapter } = resolved;
+        const extracted = await adapter.load(file, {
+          id: `doc-${file.name}-${Date.now()}`,
+          name: file.name,
           language: langChoice === "auto" ? "es" : langChoice,
         });
         if (gen !== genRef.current) return;
@@ -231,10 +291,9 @@ export function Reader() {
       } catch (error) {
         if (gen !== genRef.current) return;
         setRawPhase("error");
-        setErrorText(
-          `No se pudo leer el PDF: ${error instanceof Error ? error.message : "desconocido"}. ` +
-            "Los PDF escaneados (solo imagen) no tienen texto extraíble.",
-        );
+        const msg = error instanceof Error ? error.message : "desconocido";
+        if (msg.includes("Cancel")) return; // user cancelled
+        setErrorText(`No se pudo leer el documento: ${msg}`);
       }
     },
     [langChoice],
@@ -244,37 +303,21 @@ export function Reader() {
     async (file: File) => {
       const gen = beginLoad();
       setRawPhase("loading");
-      const invalid = validatePdfFile(file);
+      const invalid = validateDocumentFile(file);
       if (invalid) {
         setRawPhase("error");
         setErrorText(
           invalid === "file_too_large"
-            ? "El PDF supera los 25 MB."
+            ? "El documento supera los 50 MB."
             : invalid === "empty_file"
               ? "El archivo está vacío."
-              : "Solo se aceptan archivos PDF.",
+              : `Formato no soportado. Formatos aceptados: ${SUPPORTED_FORMATS_LABEL}.`,
         );
         return;
       }
-      let buffer: ArrayBuffer;
-      try {
-        buffer = await file.arrayBuffer();
-      } catch {
-        if (gen === genRef.current) {
-          setRawPhase("error");
-          setErrorText("No se pudo leer el archivo.");
-        }
-        return;
-      }
-      if (gen !== genRef.current) return;
-      if (!hasPdfMagic(new Uint8Array(buffer))) {
-        setRawPhase("error");
-        setErrorText("Ese archivo no es un PDF válido (cabecera inválida).");
-        return;
-      }
-      await analyzeBytes(buffer, file.name, gen);
+      await analyzeFile(file, gen);
     },
-    [analyzeBytes, beginLoad],
+    [analyzeFile, beginLoad],
   );
 
   const loadFixture = useCallback(
@@ -284,8 +327,10 @@ export function Reader() {
       try {
         const res = await fetch(pdfPath);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const buffer = await res.arrayBuffer();
-        await analyzeBytes(buffer, `${title}.pdf`, gen);
+        const blob = await res.blob();
+        const ext = pdfPath.match(/\.[^.]+$/)?.[0] ?? ".pdf";
+        const file = new File([blob], `${title}${ext}`, { type: blob.type });
+        await analyzeFile(file, gen);
       } catch (error) {
         if (gen !== genRef.current) return;
         setRawPhase("error");
@@ -294,7 +339,7 @@ export function Reader() {
         );
       }
     },
-    [analyzeBytes, beginLoad],
+    [analyzeFile, beginLoad],
   );
 
   /* ---- playback ---- */
@@ -472,7 +517,7 @@ export function Reader() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="application/pdf,.pdf"
+        accept={SUPPORTED_EXTENSIONS}
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -487,16 +532,16 @@ export function Reader() {
           <div className="reader-hero-icon" aria-hidden="true">
             📄
           </div>
-          <p className="reader-hero-title">Arrastra un PDF aquí o selecciona uno</p>
+          <p className="reader-hero-title">Arrastra un documento aquí o selecciona uno</p>
           <button
             type="button"
             className="reader-hero-btn"
             onClick={() => fileInputRef.current?.click()}
           >
-            Seleccionar PDF
+            Seleccionar documento
           </button>
           <p className="reader-hero-hint">
-            Procesado local en tu navegador · máximo 25 MB · no se sube nada a internet
+            {SUPPORTED_FORMATS_LABEL} · Procesado local · máximo 50 MB
           </p>
           {corpus && corpus.entries.length > 0 && (
             <div className="reader-examples">
@@ -548,21 +593,58 @@ export function Reader() {
                 {doc?.source.name}
               </h2>
               <p className="reader-doc-meta">
-                {doc?.source.pageCount != null && <>{doc.source.pageCount} páginas · </>}≈{" "}
-                {Math.max(1, Math.round(totalChars / CHARS_PER_MINUTE))} min ·{" "}
+                {formatLabel && <>{formatLabel} · </>}
+                {doc?.source.author && <>{doc.source.author} · </>}
+                {doc?.source.pageCount != null && (
+                  <>{doc.source.pageCount} secciones · </>
+                )}
+                ≈ {Math.max(1, Math.round(totalChars / CHARS_PER_MINUTE))} min ·{" "}
                 {effLang === "en" ? "English" : "Español"} ·{" "}
                 {voices.find((v) => v.id === activeVoice)?.label.split("—")[0] ??
                   activeVoice}
               </p>
             </div>
-            <button
-              type="button"
-              className="reader-change"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="cambiar documento"
-            >
-              Cambiar
-            </button>
+            <div className="reader-doc-actions">
+              {toc && toc.length > 0 && (
+                <div className="reader-toc-wrapper">
+                  <button
+                    type="button"
+                    className="reader-toc-toggle"
+                    onClick={() => setShowToc((v) => !v)}
+                    aria-expanded={showToc}
+                    aria-label="navegación por capítulos"
+                  >
+                    {activeTocIndex >= 0
+                      ? toc[activeTocIndex].label.slice(0, 30)
+                      : "Capítulos"}
+                    {" ▾"}
+                  </button>
+                  {showToc && (
+                    <nav className="reader-toc" aria-label="tabla de contenidos">
+                      {toc.map((entry, i) => (
+                        <button
+                          key={`${entry.label}-${i}`}
+                          type="button"
+                          className={`reader-toc-item ${i === activeTocIndex ? "active" : ""}`}
+                          style={{ paddingLeft: `${entry.depth * 12 + 8}px` }}
+                          onClick={() => navigateToToc(entry)}
+                        >
+                          {entry.label}
+                        </button>
+                      ))}
+                    </nav>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                className="reader-change"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="cambiar documento"
+              >
+                Cambiar
+              </button>
+            </div>
           </article>
 
           {/* Settings */}

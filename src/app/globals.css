@@ -297,6 +297,77 @@ pre code {
   color: var(--text);
 }
 
+/* ——— Document actions + TOC ——— */
+
+.reader-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reader-toc-wrapper {
+  position: relative;
+}
+
+.reader-toc-toggle {
+  font-size: 13px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 150ms;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-toc-toggle:hover {
+  background: var(--hl);
+}
+
+.reader-toc {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  margin-top: 4px;
+}
+
+.reader-toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 120ms;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-toc-item:hover {
+  background: var(--hl);
+}
+
+.reader-toc-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ——— Settings ——— */
 
 .reader-settings {

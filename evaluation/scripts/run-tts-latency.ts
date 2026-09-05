@@ -181,6 +181,7 @@ function collectSamples(wanted: number): SampleText[] {
     long: [],
   };
   for (const entry of loadManifest().entries) {
+    if (!entry.reference) continue; // reader-sample fixtures (EPUB/DOCX) have no eval reference
     const plan = buildSpokenPlan(loadReference(entry), "listen");
     for (const chunk of planChunks(plan)) {
       const text = chunk.text.trim();

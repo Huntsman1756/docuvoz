@@ -9,7 +9,7 @@ test("personal reader lands at / and links to the lab", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "DocuVoz" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Seleccionar PDF", exact: true }),
+    page.getByRole("button", { name: "Seleccionar documento", exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: /Laboratorio/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: /AUIDIO NAN/ })).toBeVisible();
@@ -75,28 +75,25 @@ test("uploaded PDF is parsed entirely client-side", async ({ page }) => {
   await expect(list.getByText(/documento de prueba/).first()).toBeVisible();
 });
 
-test("non-PDF upload is rejected before parsing", async ({ page }) => {
+test("unsupported file type is rejected before parsing", async ({ page }) => {
   await page.goto("/lab");
   await page.locator('input[type="file"]').setInputFiles({
-    name: "notes.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from("not a pdf"),
+    name: "notes.xyz",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("not a document"),
   });
-  await expect(page.locator("div.status.error")).toContainText(
-    "rejected: unsupported_type",
-  );
+  await expect(page.locator("div.status.error")).toContainText("Formato no soportado");
 });
 
-test("PDF magic bytes are enforced", async ({ page }) => {
+test("format detection works for uploaded files", async ({ page }) => {
   await page.goto("/lab");
+  // Upload a file with no recognized extension — should be rejected
   await page.locator('input[type="file"]').setInputFiles({
-    name: "renamed.txt",
+    name: "random.bin",
     mimeType: "",
-    buffer: Buffer.from("%PDF-1.4 but this is a lie"),
+    buffer: Buffer.from("random bytes that match no format"),
   });
-  // `.txt` name is rejected by the type guard first; use a pdf name to reach
-  // the magic check.
-  await expect(page.locator("div.status.error")).toContainText("rejected");
+  await expect(page.locator("div.status.error")).toContainText("Formato no soportado");
 });
 
 test("Listen mode exposes engine stats and fallback semantics", async ({ page }) => {

@@ -14,11 +14,16 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendor assets (minified pdf.js worker etc.) are not our source:
     "public/**",
+    // Vendored third-party libraries:
+    "src/adapters/document-parsers/vendor/**",
+    "node_modules/mammoth/mammoth.browser.js",
     // Scratch/runtime artifacts:
     ".tmp/**",
     ".cache/**",
     "coverage/**",
     "evaluation/results/**",
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

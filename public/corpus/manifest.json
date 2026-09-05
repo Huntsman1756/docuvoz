@@ -38,6 +38,22 @@
       "pdf": "/corpus/pdfs/simple-01.pdf",
       "reference": "/corpus/reference/simple-01.json",
       "synthetic": true
+    },
+    {
+      "id": "sample-epub-01",
+      "title": "Aventuras de DocuVoz (EPUB)",
+      "category": "multi-format-epub",
+      "description": "Synthetic three-chapter EPUB with metadata, nested TOC, headings, list, table and a footnote note document.",
+      "pdf": "/corpus/docs/docuviz-sample.epub",
+      "synthetic": true
+    },
+    {
+      "id": "sample-docx-01",
+      "title": "Informe semestral (DOCX)",
+      "category": "multi-format-docx",
+      "description": "Synthetic DOCX with headings, bullet and numbered lists, table, external link, footnote, image and text box.",
+      "pdf": "/corpus/docs/docuviz-sample.docx",
+      "synthetic": true
     }
   ]
 }

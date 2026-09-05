@@ -168,8 +168,12 @@ History: [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 MIT — see [LICENSE](LICENSE). Third-party runtime components (pdf.js, Next.js,
-React, `idb`, `zod`) are permissively licensed; model weights and audio from
-real providers are governed by **their** terms, not this license. Generated
+React, JSZip, Mammoth, DOMPurify, markdown-it, `idb`, `zod`) and the vendored
+foliate-js EPUB parser are permissively licensed; the full inventory and
+vendoring provenance live in
+[docs/third-party-notices.md](docs/third-party-notices.md). Model weights and
+audio from real providers are governed by **their** terms, not this license.
+Generated
 TTS audio is **not** redistributed in this repository: the G3a experiment
 commits the blinded manifest with per-clip SHA-256 (stimulus identity) while
 the WAV binaries stay in the private experimental kit pending confirmation of
