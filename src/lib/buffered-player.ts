@@ -364,6 +364,20 @@ export class BufferedSpeechPlayer {
     void this.seekDecodedTime(Math.max(0, time), autoplay, epoch);
   }
 
+  /** Seek forward by delta seconds (default 30s). */
+  seekForward(delta = 30): void {
+    if (!this.engine) return;
+    const newTime = Math.min(this.engine.currentTime + delta, this.estimatedDuration);
+    this.seekByTime(newTime);
+  }
+
+  /** Seek backward by delta seconds (default 15s). */
+  seekBackward(delta = 15): void {
+    if (!this.engine) return;
+    const newTime = Math.max(this.engine.currentTime - delta, 0);
+    this.seekByTime(newTime);
+  }
+
   private async seekDecodedTime(
     time: number,
     autoplay: boolean,

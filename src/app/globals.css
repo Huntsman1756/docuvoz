@@ -253,6 +253,87 @@ pre code {
   opacity: 0.8;
 }
 
+/* ——— Recent documents ——— */
+
+.reader-recents {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.reader-recents-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.reader-recents-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reader-recent-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 150ms;
+}
+
+.reader-recent-item:hover {
+  border-color: var(--accent);
+}
+
+.reader-recent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reader-recent-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-recent-meta {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.reader-recent-resume {
+  font-size: 13px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 4px 12px;
+  white-space: nowrap;
+  transition: background 150ms;
+}
+
+.reader-recent-resume:hover {
+  background: var(--hl);
+}
+
 .reader-error {
   margin: 14px auto;
   max-width: 640px;
@@ -563,6 +644,30 @@ pre code {
 .reader-seg.active {
   background: var(--hl);
   color: var(--text);
+  border-left: 3px solid var(--accent);
+  padding-left: 7px;
+}
+
+.reader-text-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader-text-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.reader-text-status {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 /* ——— Non-blocking export progress bar ——— */
@@ -652,6 +757,29 @@ pre code {
 
 .reader-transport-play:hover:not(:disabled) {
   opacity: 0.88;
+}
+
+.reader-transport-seek {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  min-width: 40px;
+  transition:
+    border-color 150ms,
+    color 150ms;
+}
+
+.reader-transport-seek:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.reader-transport-seek:disabled {
+  opacity: 0.3;
 }
 
 .reader-seek-bar {

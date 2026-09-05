@@ -4,6 +4,7 @@ import { validateFidelity } from "@/domain/spoken/fidelity";
 import { isPageNumberText, normalizeChromeKey } from "@/domain/spoken/layout-noise";
 import { buildSpokenPlan } from "@/domain/spoken/pipeline";
 import type { SpokenMode } from "@/domain/spoken/types";
+import { parseTableFromBlocks, speakTable } from "@/domain/spoken/table-speech";
 
 /** Product omission policy. Repetition alone never authorizes silence.
  * Literal validation is necessary but not sufficient: unknown prose is kept.
@@ -33,11 +34,98 @@ export function omissionIsSafe(block: DocumentBlock, doc: StructuredDocument): b
 
 export function buildProductSpokenPlan(doc: StructuredDocument, mode: SpokenMode) {
   if (mode === "literal") return buildSpokenPlan(doc, mode);
-  const blocks = doc.blocks.map((block) => {
-    if (omissionIsSafe(block, doc)) return { ...block, type: "page-footer" as const };
-    return LAYOUT_NOISE_TYPES.has(block.type)
-      ? { ...block, type: "paragraph" as const }
-      : block;
+
+  // Pre-process blocks: handle tables and footnotes specially
+  const processedBlocks: DocumentBlock[] = [];
+  let i = 0;
+
+  // Collect footnotes for later insertion
+  const footnotes: DocumentBlock[] = [];
+  const footnoteMap = new Map<string, DocumentBlock>();
+
+  // First pass: collect footnotes
+  for (const block of doc.blocks) {
+    if (block.type === "footnote") {
+      footnotes.push(block);
+      // Create a simple key based on footnote text or number
+      const match = block.text.match(/^(\d+)/);
+      if (match) {
+        footnoteMap.set(match[1], block);
+      }
+    }
+  }
+
+  // Second pass: process blocks
+  while (i < doc.blocks.length) {
+    const block = doc.blocks[i];
+
+    // Skip footnotes in the main flow (they'll be inserted at the end of paragraphs)
+    if (block.type === "footnote") {
+      i++;
+      continue;
+    }
+
+    // Check if this is the start of a table
+    if (block.type === "table-cell") {
+      const tableResult = parseTableFromBlocks(doc.blocks, i);
+      if (tableResult) {
+        const { table, endIndex } = tableResult;
+
+        // Create a synthetic paragraph with the spoken table text
+        const spokenText = speakTable(table);
+        if (spokenText) {
+          // Use the first block's ID as the base for provenance
+          processedBlocks.push({
+            id: block.id, // Keep original ID for provenance
+            type: "paragraph",
+            text: spokenText,
+            page: block.page,
+            order: block.order,
+            sectionIndex: block.sectionIndex,
+            sourceRef: block.sourceRef,
+            sourceCfi: block.sourceCfi,
+            bbox: block.bbox,
+          });
+        }
+
+        // Skip the table cells
+        i = endIndex;
+        continue;
+      }
+    }
+
+    // Process other blocks normally
+    if (omissionIsSafe(block, doc)) {
+      processedBlocks.push({ ...block, type: "page-footer" as const });
+    } else if (LAYOUT_NOISE_TYPES.has(block.type)) {
+      processedBlocks.push({ ...block, type: "paragraph" as const });
+    } else {
+      // Check if this paragraph contains footnote references
+      const footnoteRefs = block.text.match(/\[(\d+)\]/g);
+      if (footnoteRefs && footnoteRefs.length > 0) {
+        // Create a version with footnote content appended
+        let enhancedText = block.text;
+        for (const ref of footnoteRefs) {
+          const num = ref.replace(/[\[\]]/g, "");
+          const footnote = footnoteMap.get(num);
+          if (footnote) {
+            // Append footnote text after the reference
+            enhancedText += ` Nota ${num}: ${footnote.text}`;
+          }
+        }
+        processedBlocks.push({
+          ...block,
+          text: enhancedText,
+        });
+      } else {
+        processedBlocks.push(block);
+      }
+    }
+
+    i++;
+  }
+
+  return buildSpokenPlan({ ...doc, blocks: processedBlocks }, mode, {
+    detectChrome: false,
   });
-  return buildSpokenPlan({ ...doc, blocks }, mode, { detectChrome: false });
 }

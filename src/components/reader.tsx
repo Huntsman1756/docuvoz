@@ -36,6 +36,17 @@ import {
 } from "@/lib/export";
 import { ExportDialog } from "@/components/export-dialog";
 import { deriveReaderPhase, PHASE_LABELS } from "@/lib/reader-phase";
+import {
+  addRecentDocument,
+  updateRecentPosition,
+  computeContentFingerprint,
+} from "@/lib/recent-documents";
+import {
+  savePosition,
+  loadPosition,
+  type SavedPosition,
+} from "@/lib/position-persistence";
+import { LandingPage } from "@/components/landing-page";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
 const MIN_CHUNK_CHARS = 200;
@@ -81,12 +92,18 @@ export function Reader() {
   // player so "auto" resolves once to its final engine/voice (no rebuild churn).
   const [providerReady, setProviderReady] = useState(false);
 
+  // Recent documents and position persistence
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+  const [savedPosition, setSavedPosition] = useState<SavedPosition | null>(null);
+  const positionSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const playerRef = useRef<BufferedSpeechPlayer | null>(null);
   const genRef = useRef(0);
   const pendingPlayRef = useRef(false);
   const cancelExportRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSegRef = useRef<HTMLParagraphElement | null>(null);
+  const positionRestoredRef = useRef(false);
 
   /* ---- current time position (seconds) ---- */
   const [currentTime, setCurrentTime] = useState(0);
@@ -264,6 +281,26 @@ export function Reader() {
     }
   }, [prepared]);
 
+  // Restore position when saved position is available and player is ready
+  useEffect(() => {
+    const player = playerRef.current;
+    if (
+      player &&
+      savedPosition &&
+      prepared >= 1 &&
+      !pendingPlayRef.current &&
+      !positionRestoredRef.current
+    ) {
+      // Find the chunk that corresponds to the saved position
+      const targetChunk = savedPosition.chunkIndex ?? 0;
+      if (targetChunk < chunks.length) {
+        // Seek to the saved position
+        positionRestoredRef.current = true;
+        void player.seekToChunk(targetChunk, false);
+      }
+    }
+  }, [savedPosition, prepared, chunks.length]);
+
   /* ---- document loading ---- */
   const beginLoad = useCallback(() => {
     const gen = ++genRef.current;
@@ -287,8 +324,14 @@ export function Reader() {
   const analyzeFile = useCallback(
     async (file: File, gen: number) => {
       if (gen !== genRef.current) return;
-      setRawPhase("extracting");
+      setRawPhase("loading");
       try {
+        // Compute content-based fingerprint BEFORE parsing (content identity)
+        const fp = await computeContentFingerprint(file);
+        if (gen !== genRef.current) return;
+        setFingerprint(fp);
+
+        setRawPhase("extracting");
         const resolved = await resolveAdapter(file);
         if (!resolved) {
           if (gen !== genRef.current) return;
@@ -300,11 +343,19 @@ export function Reader() {
         }
         const { adapter } = resolved;
         const extracted = await adapter.load(file, {
-          id: `doc-${file.name}-${Date.now()}`,
+          id: `doc-${fp}`,
           name: file.name,
           language: langChoice === "auto" ? "es" : langChoice,
         });
         if (gen !== genRef.current) return;
+
+        // Add to recent documents with content-based fingerprint
+        addRecentDocument(extracted, fp, {});
+
+        // Try to load saved position
+        const saved = await loadPosition(fp);
+        setSavedPosition(saved);
+
         setDoc(extracted);
         setRawPhase("ready");
       } catch (error) {
@@ -339,6 +390,7 @@ export function Reader() {
     [analyzeFile, beginLoad],
   );
 
+  /* ---- load fixture ---- */
   const loadFixture = useCallback(
     async (pdfPath: string, title: string) => {
       const gen = beginLoad();
@@ -373,6 +425,36 @@ export function Reader() {
     const st = player.currentState;
     if (st === "playing") {
       player.pause();
+      // Save position on pause
+      if (fingerprint && doc) {
+        const currentChunk = chunks[chunkIndex];
+        const activeSeg = currentChunk?.segmentIds[0];
+        const activeBlock = activeSeg
+          ? plan?.segments.find((s) => s.id === activeSeg)?.provenance.blockIds[0]
+          : undefined;
+        const activeTocEntry = activeTocIndex >= 0 ? toc?.[activeTocIndex] : undefined;
+
+        void savePosition({
+          fingerprint,
+          sectionId: activeTocEntry?.label,
+          sectionLabel: activeTocEntry?.label,
+          blockIndex: activeBlock
+            ? doc.blocks.find((b) => b.id === activeBlock)?.order
+            : undefined,
+          docTime: currentTime,
+          speed: rate,
+          chunkIndex,
+          filename: doc.source.name,
+        });
+        updateRecentPosition(fingerprint, {
+          lastSection: activeTocEntry?.label,
+          lastPosition: activeBlock
+            ? doc.blocks.find((b) => b.id === activeBlock)?.order
+            : undefined,
+          lastDocTime: currentTime,
+          playbackSpeed: rate,
+        });
+      }
       return;
     }
     if (st === "paused") {
@@ -394,7 +476,18 @@ export function Reader() {
     }
     // Default: play from the current position (or beginning if idle).
     void player.play(undefined);
-  }, [queuedPlay]);
+  }, [
+    queuedPlay,
+    fingerprint,
+    doc,
+    chunks,
+    chunkIndex,
+    plan,
+    activeTocIndex,
+    toc,
+    currentTime,
+    rate,
+  ]);
 
   /* ---- export ---- */
   const runExport = useCallback(
@@ -479,11 +572,160 @@ export function Reader() {
     [chunks, chunkIndex],
   );
 
+  // Auto-scroll with user-scroll detection
+  const lastUserScrollRef = useRef(0);
+  const SCROLL_SUSPENSION_MS = 3000; // 3 seconds after manual scroll
+
+  // Track user scrolling
+  useEffect(() => {
+    const handleScroll = () => {
+      lastUserScrollRef.current = Date.now();
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   useEffect(() => {
     if (playerState === "playing") {
+      // Don't auto-scroll if user recently scrolled manually
+      const timeSinceLastScroll = Date.now() - lastUserScrollRef.current;
+      if (timeSinceLastScroll < SCROLL_SUSPENSION_MS) return;
+
       activeSegRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [chunkIndex, playerState]);
+
+  /* ---- periodic position save during playback ---- */
+  useEffect(() => {
+    if (playerState === "playing" && fingerprint && doc) {
+      // Save every 30 seconds
+      positionSaveTimerRef.current = setInterval(() => {
+        if (!fingerprint || !doc || !playerRef.current) return;
+        const currentChunk = chunks[chunkIndex];
+        const activeSeg = currentChunk?.segmentIds[0];
+        const activeBlock = activeSeg
+          ? plan?.segments.find((s) => s.id === activeSeg)?.provenance.blockIds[0]
+          : undefined;
+        const activeTocEntry = activeTocIndex >= 0 ? toc?.[activeTocIndex] : undefined;
+
+        void savePosition({
+          fingerprint,
+          sectionId: activeTocEntry?.label,
+          sectionLabel: activeTocEntry?.label,
+          blockIndex: activeBlock
+            ? doc.blocks.find((b) => b.id === activeBlock)?.order
+            : undefined,
+          docTime: currentTime,
+          speed: rate,
+          chunkIndex,
+          filename: doc.source.name,
+        });
+      }, 30000);
+    }
+
+    return () => {
+      if (positionSaveTimerRef.current) {
+        clearInterval(positionSaveTimerRef.current);
+        positionSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    playerState,
+    fingerprint,
+    doc,
+    chunks,
+    chunkIndex,
+    plan,
+    activeTocIndex,
+    toc,
+    currentTime,
+    rate,
+  ]);
+
+  /* ---- save position on page unload ---- */
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (fingerprint && doc && playerRef.current) {
+        const currentChunk = chunks[chunkIndex];
+        const activeSeg = currentChunk?.segmentIds[0];
+        const activeBlock = activeSeg
+          ? plan?.segments.find((s) => s.id === activeSeg)?.provenance.blockIds[0]
+          : undefined;
+        const activeTocEntry = activeTocIndex >= 0 ? toc?.[activeTocIndex] : undefined;
+
+        void savePosition({
+          fingerprint,
+          sectionId: activeTocEntry?.label,
+          sectionLabel: activeTocEntry?.label,
+          blockIndex: activeBlock
+            ? doc.blocks.find((b) => b.id === activeBlock)?.order
+            : undefined,
+          docTime: currentTime,
+          speed: rate,
+          chunkIndex,
+          filename: doc.source.name,
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [
+    fingerprint,
+    doc,
+    chunks,
+    chunkIndex,
+    plan,
+    activeTocIndex,
+    toc,
+    currentTime,
+    rate,
+  ]);
+
+  /* ---- keyboard shortcuts ---- */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if user is typing in an input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      const player = playerRef.current;
+      if (!player) return;
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          playPause();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (e.shiftKey) {
+            player.previous();
+          } else {
+            player.seekBackward(15);
+          }
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (e.shiftKey) {
+            player.next();
+          } else {
+            player.seekForward(30);
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [playPause]);
 
   /* ---- label / state text ---- */
   const stateLabel = PHASE_LABELS[phase];
@@ -554,37 +796,11 @@ export function Reader() {
 
       {/* ——— Empty state ——— */}
       {phase === "empty" && (
-        <section className="reader-hero" aria-label="cargar documento">
-          <div className="reader-hero-icon" aria-hidden="true">
-            📄
-          </div>
-          <p className="reader-hero-title">Arrastra un documento aquí o selecciona uno</p>
-          <button
-            type="button"
-            className="reader-hero-btn"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Seleccionar documento
-          </button>
-          <p className="reader-hero-hint">
-            {SUPPORTED_FORMATS_LABEL} · Procesado local · máximo 50 MB
-          </p>
-          {corpus && corpus.entries.length > 0 && (
-            <div className="reader-examples">
-              <span>o prueba con un ejemplo:</span>
-              {corpus.entries.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  className="reader-example"
-                  onClick={() => void loadFixture(entry.pdf, entry.title)}
-                >
-                  {entry.title}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
+        <LandingPage
+          onSelectFile={(file) => void onFile(file)}
+          onLoadFixture={(path, title) => void loadFixture(path, title)}
+          corpus={corpus}
+        />
       )}
 
       {/* ——— Loading / extracting state ——— */}
@@ -797,6 +1013,14 @@ export function Reader() {
 
           {/* Document text with live highlighting */}
           <section className="reader-text" aria-label="texto del documento">
+            <div className="reader-text-header">
+              <span className="reader-text-label">Texto del documento</span>
+              {playerState === "playing" && (
+                <span className="reader-text-status" aria-live="polite">
+                  Reproduciendo
+                </span>
+              )}
+            </div>
             {plan.segments
               .filter((s) => !s.muted && s.text.trim().length > 0)
               .map((s) => {
@@ -846,6 +1070,15 @@ export function Reader() {
           </button>
           <button
             type="button"
+            className="reader-transport-seek"
+            aria-label="retroceder 15 segundos"
+            onClick={() => playerRef.current?.seekBackward(15)}
+            disabled={!firstReady}
+          >
+            −15
+          </button>
+          <button
+            type="button"
             className="reader-transport-play"
             aria-label={
               queuedPlay || playerState === "loading"
@@ -859,6 +1092,15 @@ export function Reader() {
               : queuedPlay || playerState === "loading"
                 ? "⏳"
                 : "▶"}
+          </button>
+          <button
+            type="button"
+            className="reader-transport-seek"
+            aria-label="adelantar 30 segundos"
+            onClick={() => playerRef.current?.seekForward(30)}
+            disabled={!firstReady}
+          >
+            +30
           </button>
           <button
             type="button"
