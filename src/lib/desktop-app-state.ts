@@ -60,7 +60,9 @@ export function hydrateDesktopState(): Promise<void> {
 }
 
 /** Synchronous read from the hydrated mirror (desktop only). */
-export function desktopStateGet<K extends keyof DesktopAppState>(key: K): DesktopAppState[K] {
+export function desktopStateGet<K extends keyof DesktopAppState>(
+  key: K,
+): DesktopAppState[K] {
   return mirror[key];
 }
 

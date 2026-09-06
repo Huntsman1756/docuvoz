@@ -23,11 +23,7 @@ import {
 import { isDesktop } from "@/lib/desktop-bridge";
 
 interface Props {
-  onSelectFile: (
-    file: File,
-    handle?: FileSystemFileHandle,
-    desktopPath?: string,
-  ) => void;
+  onSelectFile: (file: File, handle?: FileSystemFileHandle, desktopPath?: string) => void;
   onLoadFixture?: (pdfPath: string, title: string) => void;
   corpus?: CorpusManifest | null;
   onFingerprint?: (fp: string) => void;
@@ -268,8 +264,7 @@ export function LandingPage({
                       </span>
                     </div>
                   </div>
-                  {isDesktop() &&
-                  (needsLocate === recent.fingerprint || !recent.path) ? (
+                  {isDesktop() && (needsLocate === recent.fingerprint || !recent.path) ? (
                     <button
                       type="button"
                       className="reader-recent-resume"
@@ -298,7 +293,7 @@ export function LandingPage({
                 </li>
               );
             })}
-            </ul>
+          </ul>
           {locateError && (
             <p className="reader-error" role="alert">
               {locateError}

@@ -16,8 +16,13 @@ export function desktopInvoke<T>(
   cmd: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  const tauri = (window as { __TAURI__?: { core: { invoke: <R>(c: string, a?: Record<string, unknown>) => Promise<R> } } })
-    .__TAURI__;
+  const tauri = (
+    window as {
+      __TAURI__?: {
+        core: { invoke: <R>(c: string, a?: Record<string, unknown>) => Promise<R> };
+      };
+    }
+  ).__TAURI__;
   if (!tauri) {
     return Promise.reject(new Error("desktop_bridge_unavailable"));
   }

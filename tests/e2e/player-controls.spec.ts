@@ -118,7 +118,10 @@ for (const format of ["pdf", "epub", "docx", "txt", "md", "html"]) {
       .toEqual([1.5]);
     await page.locator(".reader-play").click();
     await expect.poll(() => page.evaluate(() => window.audioProbe().pending)).toBe(0);
-    const nextChunk = page.getByRole("button", { name: "fragmento siguiente", exact: true });
+    const nextChunk = page.getByRole("button", {
+      name: "fragmento siguiente",
+      exact: true,
+    });
     await expect(nextChunk).toBeEnabled();
     await nextChunk.click();
     await expect(page.locator("main")).toHaveAttribute("data-phase", "paused");

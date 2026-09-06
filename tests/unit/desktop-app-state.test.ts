@@ -13,16 +13,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const bridge = vi.hoisted(() => {
   const stateSaved = new Map<string, unknown>();
   const isDesktop = vi.fn(() => true);
-  const desktopInvoke = vi.fn(
-    async (cmd: string, args?: Record<string, unknown>) => {
-      if (cmd === "desktop_state_load") return stateLoaded;
-      if (cmd === "desktop_state_save") {
-        stateSaved.set("state", args?.state);
-        return null;
-      }
-      throw new Error(`unexpected command: ${cmd}`);
-    },
-  );
+  const desktopInvoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === "desktop_state_load") return stateLoaded;
+    if (cmd === "desktop_state_save") {
+      stateSaved.set("state", args?.state);
+      return null;
+    }
+    throw new Error(`unexpected command: ${cmd}`);
+  });
   let stateLoaded: unknown = null;
   return {
     stateSaved,

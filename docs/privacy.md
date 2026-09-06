@@ -10,13 +10,13 @@ External transmission starts when the user initiates playback or export.
 
 ## Routing matrix
 
-| Mode                | Provider selected        | Text leaves browser?    | Destination                       | When                          | Play required?                      |
-| ------------------- | ------------------------ | ----------------------- | --------------------------------- | ----------------------------- | ----------------------------------- |
-| Auto (default)      | Server picks best engine | Yes — spoken chunk text | `/api/speech` → provider          | On synthesis (chunk-by-chunk) | Yes — first Play triggers synthesis |
-| Auto + Edge enabled | Edge TTS (unofficial online service) | Yes — spoken chunk text | `/api/speech` → Edge WebSocket | On synthesis | Yes |
-| Explicit Edge       | Edge TTS                 | Yes — spoken chunk text | `/api/speech` → Edge WebSocket    | On synthesis                  | Yes                                 |
-| Explicit NaN        | NaN/Kokoro               | Yes — spoken chunk text | `/api/speech` → NaN HTTP endpoint | On synthesis                  | Yes                                 |
-| Mock (CI/dev)       | Mock WAV                 | No external call        | `/api/speech` → in-memory mock    | On synthesis                  | Yes                                 |
+| Mode                | Provider selected                    | Text leaves browser?    | Destination                       | When                          | Play required?                      |
+| ------------------- | ------------------------------------ | ----------------------- | --------------------------------- | ----------------------------- | ----------------------------------- |
+| Auto (default)      | Server picks best engine             | Yes — spoken chunk text | `/api/speech` → provider          | On synthesis (chunk-by-chunk) | Yes — first Play triggers synthesis |
+| Auto + Edge enabled | Edge TTS (unofficial online service) | Yes — spoken chunk text | `/api/speech` → Edge WebSocket    | On synthesis                  | Yes                                 |
+| Explicit Edge       | Edge TTS                             | Yes — spoken chunk text | `/api/speech` → Edge WebSocket    | On synthesis                  | Yes                                 |
+| Explicit NaN        | NaN/Kokoro                           | Yes — spoken chunk text | `/api/speech` → NaN HTTP endpoint | On synthesis                  | Yes                                 |
+| Mock (CI/dev)       | Mock WAV                             | No external call        | `/api/speech` → in-memory mock    | On synthesis                  | Yes                                 |
 
 **What is transmitted:** Each spoken chunk (≈400 chars of transformed text)
 is sent to `/api/speech` on the same origin. The server forwards it to the

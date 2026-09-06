@@ -13,10 +13,7 @@
  * - No fallback for missing hash: documents without SHA-256 cannot be resumed
  */
 import type { StructuredDocument } from "@/domain/documents/types";
-import {
-  desktopStateGet,
-  desktopStateSet,
-} from "./desktop-app-state";
+import { desktopStateGet, desktopStateSet } from "./desktop-app-state";
 import { isDesktop } from "./desktop-bridge";
 
 const STORAGE_KEY = "auidionan-recent";
@@ -228,7 +225,11 @@ export function clearRecentPath(fingerprint: string): void {
   const recents = getRecentDocuments();
   const index = recents.findIndex((r) => r.fingerprint === fingerprint);
   if (index < 0) return;
-  const entry: RecentDocument = { ...recents[index], path: undefined, lastOpened: Date.now() };
+  const entry: RecentDocument = {
+    ...recents[index],
+    path: undefined,
+    lastOpened: Date.now(),
+  };
   recents[index] = entry;
   writeRecentsRaw(recents);
 }

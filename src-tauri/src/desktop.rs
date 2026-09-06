@@ -207,6 +207,24 @@ pub async fn desktop_read_document(path: String) -> Result<tauri::ipc::Response,
 mod tests {
     use super::*;
 
+    /// Roundtrip against the REAL OS credential store. `#[ignore]`d by
+    /// default (machine-dependent, writes a real entry); run explicitly:
+    ///   cargo test -- --ignored
+    #[test]
+    #[ignore]
+    fn keyring_roundtrip_real_store() {
+        let probe = "docuvoz-keyring-probe-0123456789";
+        let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).unwrap();
+        entry.set_password(probe).unwrap();
+        let read = entry.get_password().unwrap();
+        assert_eq!(read, probe);
+        entry.delete_credential().unwrap();
+        match entry.get_password() {
+            Err(keyring::Error::NoEntry) => {}
+            other => panic!("expected NoEntry after delete, got {other:?}"),
+        }
+    }
+
     #[test]
     fn rejects_relative_paths() {
         assert_eq!(validate_document_path("relative/file.pdf").unwrap_err(), "invalid_path");

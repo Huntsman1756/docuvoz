@@ -39,7 +39,10 @@ test("RESUME: restored location, paused, no autoplay", async ({ page }) => {
   await expect(page.locator(".reader-play")).toHaveText(/Pausar/, { timeout: 30_000 });
   // Wait until the transport is ready: a disabled click would be a no-op and
   // the saved position would end up as chunk 0.
-  const nextChunk = page.getByRole("button", { name: "fragmento siguiente", exact: true });
+  const nextChunk = page.getByRole("button", {
+    name: "fragmento siguiente",
+    exact: true,
+  });
   await expect(nextChunk).toBeEnabled();
   await nextChunk.click();
   await expect
@@ -95,7 +98,10 @@ test("WRONG DOCUMENT: same filename, different bytes → no incorrect resume", a
   // Play, advance, pause (save position for content A).
   await page.locator(".reader-play").click();
   await expect(page.locator(".reader-play")).toHaveText(/Pausar/, { timeout: 30_000 });
-  const nextChunkB = page.getByRole("button", { name: "fragmento siguiente", exact: true });
+  const nextChunkB = page.getByRole("button", {
+    name: "fragmento siguiente",
+    exact: true,
+  });
   await expect(nextChunkB).toBeEnabled();
   await nextChunkB.click();
   await page.locator(".reader-play").click();
@@ -276,7 +282,10 @@ test("CURRENT BLOCK: play highlights the active block; seek moves it", async ({
 
   // Seek to the next chunk: the previously active block(s) become inactive and
   // the target chunk's block(s) become active.
-  const nextChunkC = page.getByRole("button", { name: "fragmento siguiente", exact: true });
+  const nextChunkC = page.getByRole("button", {
+    name: "fragmento siguiente",
+    exact: true,
+  });
   await expect(nextChunkC).toBeEnabled();
   await nextChunkC.click();
   await expect(active).not.toHaveCount(0);

@@ -52,7 +52,12 @@ describe("recent documents (desktop backend)", () => {
   });
 
   it("persists a desktop path reference with the entry", () => {
-    addRecentDocument(fakeDoc("informe.pdf"), "fp-1", {}, { path: "C:\\docs\\informe.pdf" });
+    addRecentDocument(
+      fakeDoc("informe.pdf"),
+      "fp-1",
+      {},
+      { path: "C:\\docs\\informe.pdf" },
+    );
     const recents = getRecentDocuments();
     expect(recents).toHaveLength(1);
     expect(recents[0].path).toBe("C:\\docs\\informe.pdf");
@@ -69,10 +74,15 @@ describe("recent documents (desktop backend)", () => {
   });
 
   it("clears a stale path while keeping position metadata", () => {
-    addRecentDocument(fakeDoc("a.pdf"), "fp-1", {
-      lastDocTime: 30,
-      lastSection: "Cap. 1",
-    }, { path: "C:\\a.pdf" });
+    addRecentDocument(
+      fakeDoc("a.pdf"),
+      "fp-1",
+      {
+        lastDocTime: 30,
+        lastSection: "Cap. 1",
+      },
+      { path: "C:\\a.pdf" },
+    );
     clearRecentPath("fp-1");
     const entry = getRecentDocuments()[0];
     expect(entry.path).toBeUndefined();

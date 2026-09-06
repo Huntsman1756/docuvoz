@@ -106,6 +106,32 @@ npm run dev                    # http://localhost:3000
 Open <http://localhost:3000>, upload or drag a document, and press **Play**. The
 default mock configuration runs without any external credentials.
 
+## Desktop (Tauri, v0.2 beta)
+
+DocuVoz ships an optional desktop build (Windows beta; macOS arm64 via CI):
+static frontend + a bundled Node sidecar that reuses the same server speech
+runtime. No Node, npm, Git or `.env` file is required on the user machine.
+
+- **Files:** the desktop app opens documents through the OS-native file
+  dialog; Rust reads and validates the file (50 MB cap) and the WebView only
+  ever receives document bytes. Recent documents store a local path reference
+  plus the content fingerprint; reopen verifies the fingerprint before
+  restoring a position — a moved/deleted file offers a native "Locate file"
+  action instead of silently loading something else.
+- **Continuity state** (recents, resume positions, desktop settings) is
+  persisted in OS app-data (official Tauri store plugin), not in browser
+  storage. The web build keeps its existing localStorage/IndexedDB behavior.
+- **Secrets:** the optional NaN API key is stored in the OS credential store
+  (Windows Credential Manager / macOS Keychain) via the `keyring` crate —
+  never in localStorage, IndexedDB, plaintext files or process arguments, and
+  never sent to the WebView. See [docs/decisions/ADR-006-desktop-secrets-keyring.md](docs/decisions/ADR-006-desktop-secrets-keyring.md).
+- **Speech on desktop** runs in a loopback-only sidecar (`127.0.0.1`,
+  per-process bearer token held by Rust, binary audio frame over IPC). Edge
+  TTS wording and fallback semantics above apply unchanged.
+
+Build locally: `npx tauri build` (installer under
+`src-tauri/target/release/bundle/nsis/`).
+
 ## TTS providers
 
 DocuVoz routes speech through a server-side provider abstraction. The browser

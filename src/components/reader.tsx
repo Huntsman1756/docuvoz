@@ -49,10 +49,7 @@ import {
 import { storeFileHandle } from "@/lib/file-handle-persistence";
 import { createSpeechTransport } from "@/lib/speech-transport";
 import { isDesktop, desktopInvoke } from "@/lib/desktop-bridge";
-import {
-  desktopStateGet,
-  desktopStateSet,
-} from "@/lib/desktop-app-state";
+import { desktopStateGet, desktopStateSet } from "@/lib/desktop-app-state";
 import { LandingPage } from "@/components/landing-page";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
@@ -1194,7 +1191,10 @@ export function Reader() {
                         />
                       </label>
                       <label>
-                        <span>Servicio NaN — clave (se guarda en el gestor de credenciales del sistema)</span>
+                        <span>
+                          Servicio NaN — clave (se guarda en el gestor de credenciales del
+                          sistema)
+                        </span>
                         <input
                           type="password"
                           aria-label="clave del servicio NaN"
