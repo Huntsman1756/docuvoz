@@ -4,12 +4,61 @@ import { useCallback, useMemo } from "react";
 import { getRecentDocuments, type RecentDocument } from "@/lib/recent-documents";
 import { SUPPORTED_FORMATS_LABEL } from "@/adapters/document-parsers/adapter-registry";
 import type { CorpusManifest } from "@/lib/corpus";
+import {
+  supportsFileSystemAccess,
+  getFileHandle,
+  ensureReadPermission,
+} from "@/lib/file-handle-persistence";
 
 interface Props {
-  onSelectFile: (file: File) => void;
+  onSelectFile: (file: File, handle?: FileSystemFileHandle) => void;
   onLoadFixture?: (pdfPath: string, title: string) => void;
   corpus?: CorpusManifest | null;
   onFingerprint?: (fp: string) => void;
+}
+
+const FILE_ACCEPT = ".pdf,.epub,.docx,.txt,.md,.html";
+
+/** Show the browser-native file picker when supported; otherwise fall back. */
+async function pickFile(): Promise<{ file: File; handle?: FileSystemFileHandle } | null> {
+  if (supportsFileSystemAccess()) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          {
+            description: "Documentos",
+            accept: {
+              "application/pdf": [".pdf"],
+              "application/epub+zip": [".epub"],
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+                ".docx",
+              ],
+              "text/plain": [".txt", ".md"],
+              "text/html": [".html"],
+            },
+          },
+        ],
+      });
+      const file = await handle.getFile();
+      return { file, handle };
+    } catch (error) {
+      // AbortError = user cancelled the picker; anything else falls through
+      // to the plain input fallback rather than silently failing.
+      if ((error as DOMException)?.name === "AbortError") return null;
+    }
+  }
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = FILE_ACCEPT;
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) resolve({ file });
+      else resolve(null);
+    };
+    input.click();
+  });
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -39,10 +88,28 @@ export function LandingPage({
   const recents = useMemo(() => getRecentDocuments(), []);
 
   const handleResume = useCallback(
-    (recent: RecentDocument) => {
+    async (recent: RecentDocument) => {
+      // Prefer a persisted browser handle (Chromium File System Access).
+      if (supportsFileSystemAccess()) {
+        const handle = await getFileHandle(recent.fingerprint);
+        if (handle) {
+          const granted = await ensureReadPermission(handle);
+          if (granted) {
+            try {
+              const file = await handle.getFile();
+              onFingerprint?.(recent.fingerprint);
+              onSelectFile(file, handle);
+              return;
+            } catch {
+              // Stale/deleted file: fall through to reselection.
+            }
+          }
+        }
+      }
+      // Fallback: current file-reselection + content-fingerprint workflow.
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = ".pdf,.epub,.docx,.txt,.md,.html";
+      input.accept = FILE_ACCEPT;
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -64,15 +131,9 @@ export function LandingPage({
       <button
         type="button"
         className="reader-hero-btn"
-        onClick={() => {
-          const input = document.createElement("input");
-          input.type = "file";
-          input.accept = ".pdf,.epub,.docx,.txt,.md,.html";
-          input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) onSelectFile(file);
-          };
-          input.click();
+        onClick={async () => {
+          const picked = await pickFile();
+          if (picked) onSelectFile(picked.file, picked.handle);
         }}
       >
         Seleccionar documento
