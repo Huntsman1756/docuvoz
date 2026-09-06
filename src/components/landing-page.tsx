@@ -9,6 +9,7 @@ interface Props {
   onSelectFile: (file: File) => void;
   onLoadFixture?: (pdfPath: string, title: string) => void;
   corpus?: CorpusManifest | null;
+  onFingerprint?: (fp: string) => void;
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -22,29 +23,36 @@ function formatTimeAgo(timestamp: number): string {
   return `hace ${days} días`;
 }
 
-function formatDuration(seconds: number): string {
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return "00:00";
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
-  if (m === 0) return `${s}s`;
-  return `${m}m ${s}s`;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-export function LandingPage({ onSelectFile, onLoadFixture, corpus }: Props) {
+export function LandingPage({
+  onSelectFile,
+  onLoadFixture,
+  corpus,
+  onFingerprint,
+}: Props) {
   const recents = useMemo(() => getRecentDocuments(), []);
 
   const handleResume = useCallback(
-    (_recent: RecentDocument) => {
-      void _recent;
+    (recent: RecentDocument) => {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = ".pdf,.epub,.docx,.txt,.md,.html";
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) onSelectFile(file);
+        if (file) {
+          onFingerprint?.(recent.fingerprint);
+          onSelectFile(file);
+        }
       };
       input.click();
     },
-    [onSelectFile],
+    [onSelectFile, onFingerprint],
   );
 
   return (
@@ -93,31 +101,50 @@ export function LandingPage({ onSelectFile, onLoadFixture, corpus }: Props) {
         <div className="reader-recents">
           <h3 className="reader-recents-title">Documentos recientes</h3>
           <ul className="reader-recents-list" role="list">
-            {recents.map((recent) => (
-              <li key={recent.fingerprint} className="reader-recent-item">
-                <div className="reader-recent-info">
-                  <span className="reader-recent-name" title={recent.filename}>
-                    {recent.title || recent.filename}
-                  </span>
-                  <span className="reader-recent-meta">
-                    {recent.docType.toUpperCase()}
-                    {recent.lastSection && ` · ${recent.lastSection}`}
-                    {recent.lastDocTime != null &&
-                      ` · ${formatDuration(recent.lastDocTime)}`}
-                    {" · "}
-                    {formatTimeAgo(recent.lastOpened)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="reader-recent-resume"
-                  onClick={() => handleResume(recent)}
-                  aria-label={`Reanudar ${recent.filename}`}
-                >
-                  Reanudar
-                </button>
-              </li>
-            ))}
+            {recents.map((recent) => {
+              const hasPosition = recent.lastDocTime != null && recent.lastDocTime > 0;
+              return (
+                <li key={recent.fingerprint} className="reader-recent-item">
+                  <div className="reader-recent-info">
+                    <span className="reader-recent-name" title={recent.filename}>
+                      {recent.title || recent.filename}
+                    </span>
+                    <div className="reader-recent-details">
+                      <span className="reader-recent-type">
+                        {recent.docType.toUpperCase()}
+                      </span>
+                      {recent.lastSection && (
+                        <span className="reader-recent-section">
+                          · {recent.lastSection}
+                        </span>
+                      )}
+                      {hasPosition && (
+                        <span className="reader-recent-position">
+                          · {formatTime(recent.lastDocTime!)}
+                        </span>
+                      )}
+                      <span className="reader-recent-time">
+                        {formatTimeAgo(recent.lastOpened)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="reader-recent-resume"
+                    onClick={() => handleResume(recent)}
+                    aria-label={`Reanudar ${recent.filename}`}
+                    disabled={!hasPosition}
+                    title={
+                      hasPosition
+                        ? `Reanudar desde ${recent.lastSection || "el inicio"}`
+                        : "Sin posición guardada"
+                    }
+                  >
+                    {hasPosition ? "Reanudar" : "Cargar"}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

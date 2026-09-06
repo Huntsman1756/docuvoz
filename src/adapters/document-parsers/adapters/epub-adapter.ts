@@ -408,6 +408,10 @@ async function extractFromBook(
     );
   }
 
+  if (blocks.length === 0) {
+    throw new Error("No se ha encontrado texto legible en este documento.");
+  }
+
   // Build TOC from book.toc with blockIndex resolved to real block order.
   const toc = buildToc(book.toc, firstBlockOrderByPath);
 

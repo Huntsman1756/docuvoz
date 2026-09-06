@@ -47,7 +47,7 @@ export const markdownAdapter: DocumentAdapter = {
     const tokens = md.parse(text, {});
 
     const blocks = tokensToBlocks(tokens);
-    if (blocks.length === 0) {
+    if (blocks.length === 0 || blocks.every((b) => b.text.trim().length === 0)) {
       throw new Error("No se ha encontrado texto legible en este documento.");
     }
 

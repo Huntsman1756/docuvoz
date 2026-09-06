@@ -60,6 +60,17 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
+function formatTimeRemaining(
+  totalDuration: number,
+  elapsed: number,
+  rate: number,
+): string {
+  if (!isFinite(totalDuration) || totalDuration <= 0) return "00:00";
+  const remaining = (totalDuration - elapsed) / Math.max(rate, 0.1);
+  if (remaining <= 0) return "00:00";
+  return formatTime(remaining);
+}
+
 export function Reader() {
   const [corpus, setCorpus] = useState<CorpusManifest | null>(null);
   const [engines, setEngines] = useState<EngineDescriptor[]>([]);
@@ -88,6 +99,7 @@ export function Reader() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [showToc, setShowToc] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<"off" | "one" | "all">("off");
   // Provider metadata from /api/health has resolved; only then do we build the
   // player so "auto" resolves once to its final engine/voice (no rebuild churn).
   const [providerReady, setProviderReady] = useState(false);
@@ -104,6 +116,10 @@ export function Reader() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSegRef = useRef<HTMLParagraphElement | null>(null);
   const positionRestoredRef = useRef(false);
+  // Refs keep the player stable across repeat-mode / chunk changes so toggling
+  // repeat (or advancing a chunk) no longer tears down in-flight playback.
+  const repeatModeRef = useRef<"off" | "one" | "all">("off");
+  const chunkIndexRef = useRef(0);
 
   /* ---- current time position (seconds) ---- */
   const [currentTime, setCurrentTime] = useState(0);
@@ -120,10 +136,6 @@ export function Reader() {
         setEngines(body?.engines?.filter((e) => e.id in ENGINES) ?? []),
       )
       .catch(() => setEngines([]))
-      // Provider metadata (which engine/voice "auto" resolves to) is now final.
-      // Building the player before this point would resolve "auto" to a
-      // placeholder engine and then rebuild the player once the real engines
-      // land — destroying in-flight playback and re-synthesizing every chunk.
       .finally(() => setProviderReady(true));
   }, []);
 
@@ -205,6 +217,11 @@ export function Reader() {
     [plan, chunks, doc],
   );
 
+  /* ---- keep repeat mode in a ref so the player stays stable ---- */
+  useEffect(() => {
+    repeatModeRef.current = repeatMode;
+  }, [repeatMode]);
+
   /* ---- player lifecycle ---- */
   useEffect(() => {
     playerRef.current?.destroy();
@@ -213,9 +230,6 @@ export function Reader() {
       playerRef.current = null;
       return;
     }
-    // Wait for provider metadata before building: "auto" resolves to a real
-    // engine/voice only once /api/health has answered. Building earlier then
-    // rebuilding would kill playback and re-synthesize the whole document.
     if (!providerReady) {
       playerRef.current = null;
       return;
@@ -230,8 +244,18 @@ export function Reader() {
             pendingPlayRef.current = false;
             setQueuedPlay(false);
           }
+          if (s === "ended") {
+            if (repeatModeRef.current === "all") {
+              void player.play(0);
+            } else if (repeatModeRef.current === "one") {
+              void player.seekToChunk(chunkIndexRef.current, true);
+            }
+          }
         },
-        onChunkChange: setChunkIndex,
+        onChunkChange: (i) => {
+          chunkIndexRef.current = i;
+          setChunkIndex(i);
+        },
         onMetrics: () => {},
         onTimeUpdate: (pos, dur) => {
           setCurrentTime(pos);
@@ -270,9 +294,6 @@ export function Reader() {
     playerRef.current?.setPlaybackRate(rate);
   }, [rate]);
 
-  // Auto-start playback when the first chunk is ready and the user requested it.
-  // Fire exactly once per intent: clear the pending flag as we start, so a run
-  // of prepared-chunk updates cannot re-invoke play(0) and restart playback.
   useEffect(() => {
     const player = playerRef.current;
     if (player && pendingPlayRef.current && prepared >= 1) {
@@ -281,7 +302,6 @@ export function Reader() {
     }
   }, [prepared]);
 
-  // Restore position when saved position is available and player is ready
   useEffect(() => {
     const player = playerRef.current;
     if (
@@ -291,10 +311,8 @@ export function Reader() {
       !pendingPlayRef.current &&
       !positionRestoredRef.current
     ) {
-      // Find the chunk that corresponds to the saved position
       const targetChunk = savedPosition.chunkIndex ?? 0;
       if (targetChunk < chunks.length) {
-        // Seek to the saved position
         positionRestoredRef.current = true;
         void player.seekToChunk(targetChunk, false);
       }
@@ -311,6 +329,7 @@ export function Reader() {
     playerRef.current?.destroy();
     playerRef.current = null;
     pendingPlayRef.current = false;
+    positionRestoredRef.current = false;
     setQueuedPlay(false);
     setPlayerState("idle");
     setChunkIndex(0);
@@ -326,7 +345,6 @@ export function Reader() {
       if (gen !== genRef.current) return;
       setRawPhase("loading");
       try {
-        // Compute content-based fingerprint BEFORE parsing (content identity)
         const fp = await computeContentFingerprint(file);
         if (gen !== genRef.current) return;
         setFingerprint(fp);
@@ -349,10 +367,8 @@ export function Reader() {
         });
         if (gen !== genRef.current) return;
 
-        // Add to recent documents with content-based fingerprint
         addRecentDocument(extracted, fp, {});
 
-        // Try to load saved position
         const saved = await loadPosition(fp);
         setSavedPosition(saved);
 
@@ -362,7 +378,7 @@ export function Reader() {
         if (gen !== genRef.current) return;
         setRawPhase("error");
         const msg = error instanceof Error ? error.message : "desconocido";
-        if (msg.includes("Cancel")) return; // user cancelled
+        if (msg.includes("Cancel")) return;
         setErrorText(`No se pudo leer el documento: ${msg}`);
       }
     },
@@ -390,7 +406,6 @@ export function Reader() {
     [analyzeFile, beginLoad],
   );
 
-  /* ---- load fixture ---- */
   const loadFixture = useCallback(
     async (pdfPath: string, title: string) => {
       const gen = beginLoad();
@@ -417,15 +432,10 @@ export function Reader() {
   const playPause = useCallback(() => {
     const player = playerRef.current;
     if (!player) return;
-    // A play intent is pending (queued during preparation / auto-start in
-    // flight): an extra click must not toggle pause mid-transition. It would
-    // otherwise race the "Preparando audio…" → playing handoff and leave the
-    // player paused before the user ever heard it.
     if (queuedPlay) return;
     const st = player.currentState;
     if (st === "playing") {
       player.pause();
-      // Save position on pause
       if (fingerprint && doc) {
         const currentChunk = chunks[chunkIndex];
         const activeSeg = currentChunk?.segmentIds[0];
@@ -461,20 +471,20 @@ export function Reader() {
       player.resume();
       return;
     }
-    // During preparation, trigger synthesis then record the intent —
-    // auto-starts when chunk 0 is ready.
     if (player.preparedCount < 1) {
       player.prepare();
       pendingPlayRef.current = true;
       setQueuedPlay(true);
       return;
     }
-    // Playback completed — start from the beginning again.
     if (st === "ended") {
-      void player.play(0);
+      if (repeatModeRef.current === "one") {
+        void player.seekToChunk(chunkIndexRef.current, true);
+      } else {
+        void player.play(0);
+      }
       return;
     }
-    // Default: play from the current position (or beginning if idle).
     void player.play(undefined);
   }, [
     queuedPlay,
@@ -521,6 +531,10 @@ export function Reader() {
       } finally {
         setExporting(false);
         setExportProgress(null);
+        // Keep the export dialog open for the whole export so its "Cancelar"
+        // button (rendered on top of the transport bar) stays clickable; close
+        // it only once the export finishes or is cancelled.
+        setShowExportDialog(false);
       }
     },
     [doc, exporting, totalChunks],
@@ -572,11 +586,35 @@ export function Reader() {
     [chunks, chunkIndex],
   );
 
+  /* ---- table / footnote segment markers ---- */
+  const segmentHasTable = useMemo(() => {
+    const m = new Set<string>();
+    plan?.segments.forEach((s) => {
+      if (
+        s.text.includes("Fila ") ||
+        s.text.includes("Fila.") ||
+        s.text.includes("Row ")
+      ) {
+        m.add(s.id);
+      }
+    });
+    return m;
+  }, [plan]);
+
+  const segmentHasFootnote = useMemo(() => {
+    const m = new Set<string>();
+    plan?.segments.forEach((s) => {
+      if (/ Nota \d+:/.test(s.text)) {
+        m.add(s.id);
+      }
+    });
+    return m;
+  }, [plan]);
+
   // Auto-scroll with user-scroll detection
   const lastUserScrollRef = useRef(0);
-  const SCROLL_SUSPENSION_MS = 3000; // 3 seconds after manual scroll
+  const SCROLL_SUSPENSION_MS = 3000;
 
-  // Track user scrolling
   useEffect(() => {
     const handleScroll = () => {
       lastUserScrollRef.current = Date.now();
@@ -587,7 +625,6 @@ export function Reader() {
 
   useEffect(() => {
     if (playerState === "playing") {
-      // Don't auto-scroll if user recently scrolled manually
       const timeSinceLastScroll = Date.now() - lastUserScrollRef.current;
       if (timeSinceLastScroll < SCROLL_SUSPENSION_MS) return;
 
@@ -598,7 +635,6 @@ export function Reader() {
   /* ---- periodic position save during playback ---- */
   useEffect(() => {
     if (playerState === "playing" && fingerprint && doc) {
-      // Save every 30 seconds
       positionSaveTimerRef.current = setInterval(() => {
         if (!fingerprint || !doc || !playerRef.current) return;
         const currentChunk = chunks[chunkIndex];
@@ -685,17 +721,18 @@ export function Reader() {
   /* ---- keyboard shortcuts ---- */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if user is typing in an input
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
+        e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLElement &&
+          (e.target.isContentEditable ||
+            e.target.closest('[contenteditable="true"], [contenteditable=""]') !== null))
       ) {
         return;
       }
 
       const player = playerRef.current;
-      if (!player) return;
 
       switch (e.code) {
         case "Space":
@@ -705,17 +742,56 @@ export function Reader() {
         case "ArrowLeft":
           e.preventDefault();
           if (e.shiftKey) {
-            player.previous();
+            player?.previous();
           } else {
-            player.seekBackward(15);
+            player?.seekBackward(15);
           }
           break;
         case "ArrowRight":
           e.preventDefault();
           if (e.shiftKey) {
-            player.next();
+            player?.next();
           } else {
-            player.seekForward(30);
+            player?.seekForward(30);
+          }
+          break;
+        case "ArrowUp":
+          if (e.shiftKey) {
+            e.preventDefault();
+            setRate((prev) => {
+              const idx = RATES.indexOf(prev);
+              const next = Math.min(idx + 1, RATES.length - 1);
+              return RATES[next];
+            });
+          }
+          break;
+        case "ArrowDown":
+          if (e.shiftKey) {
+            e.preventDefault();
+            setRate((prev) => {
+              const idx = RATES.indexOf(prev);
+              const next = Math.max(idx - 1, 0);
+              return RATES[next];
+            });
+          }
+          break;
+        case "KeyR":
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            setRepeatMode((prev) => {
+              const next: Record<string, "off" | "one" | "all"> = {
+                off: "one",
+                one: "all",
+                all: "off",
+              };
+              return next[prev] ?? "off";
+            });
+          }
+          break;
+        case "KeyE":
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            openExportDialog();
           }
           break;
         default:
@@ -725,7 +801,7 @@ export function Reader() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [playPause]);
+  }, [playPause, openExportDialog]);
 
   /* ---- label / state text ---- */
   const stateLabel = PHASE_LABELS[phase];
@@ -740,10 +816,11 @@ export function Reader() {
 
   const barPct = exporting ? exportPct : playerState === "idle" ? prepPct : 0;
 
-  // Determine if we're in a buffering state (mid-document)
   const isBuffering = playerState === "buffering" || playerState === "loading";
   const isInitialBuffer =
     playerState === "loading" || (playerState === "buffering" && currentTime === 0);
+
+  const isPlaying = playerState === "playing";
 
   const playLabel = exporting
     ? "Descargando…"
@@ -762,6 +839,8 @@ export function Reader() {
     <main
       className="reader"
       data-phase={phase}
+      data-playing={isPlaying}
+      data-repeat={repeatMode}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -800,6 +879,7 @@ export function Reader() {
           onSelectFile={(file) => void onFile(file)}
           onLoadFixture={(path, title) => void loadFixture(path, title)}
           corpus={corpus}
+          onFingerprint={(fp) => setFingerprint(fp)}
         />
       )}
 
@@ -868,9 +948,10 @@ export function Reader() {
                           key={`${entry.label}-${i}`}
                           type="button"
                           className={`reader-toc-item ${i === activeTocIndex ? "active" : ""}`}
-                          style={{ paddingLeft: `${entry.depth * 12 + 8}px` }}
+                          style={{ paddingLeft: `${entry.depth * 12 + 16}px` }}
                           onClick={() => navigateToToc(entry)}
                         >
+                          {i === activeTocIndex && <span className="reader-toc-dot" />}
                           {entry.label}
                         </button>
                       ))}
@@ -916,7 +997,7 @@ export function Reader() {
                 value={mode}
                 onChange={(e) => setMode(e.target.value as SpokenMode)}
               >
-                <option value="listen">Listen</option>
+                <option value="listen">Escuchar</option>
                 <option value="literal">Literal</option>
               </select>
             </label>
@@ -1017,7 +1098,7 @@ export function Reader() {
               <span className="reader-text-label">Texto del documento</span>
               {playerState === "playing" && (
                 <span className="reader-text-status" aria-live="polite">
-                  Reproduciendo
+                  <span className="reader-now-playing-dot" /> Reproduciendo
                 </span>
               )}
             </div>
@@ -1026,15 +1107,30 @@ export function Reader() {
               .map((s) => {
                 const active = activeSegments.has(s.id);
                 const target = chunkOfSegment.get(s.id) ?? 0;
+                const hasTable = segmentHasTable.has(s.id);
+                const hasFootnote = segmentHasFootnote.has(s.id);
                 return (
                   <p
                     key={s.id}
                     ref={(el) => {
                       if (active) activeSegRef.current = el;
                     }}
-                    className={active ? "reader-seg active" : "reader-seg"}
+                    className={`reader-seg${active ? " active" : ""}${hasTable ? " reader-seg-table" : ""}${hasFootnote ? " reader-seg-footnote" : ""}`}
                     onClick={() => void playerRef.current?.seekToChunk(target)}
-                    title="Ir a este punto"
+                    title={
+                      hasTable
+                        ? "Tabla — haz clic para ir"
+                        : hasFootnote
+                          ? "Nota al pie — haz clic para ir"
+                          : "Haz clic para ir a este punto"
+                    }
+                    aria-label={
+                      hasTable
+                        ? "Sección con tabla"
+                        : hasFootnote
+                          ? "Sección con nota al pie"
+                          : ""
+                    }
                   >
                     {mode === "literal" ? s.sourceText : s.text}
                   </p>
@@ -1051,7 +1147,12 @@ export function Reader() {
           <span className="reader-export-label">
             {exportProgress ? `${exportProgress.done}/${exportProgress.total}` : ""}
           </span>
-          <button type="button" className="reader-export-cancel" onClick={cancelExport}>
+          <button
+            type="button"
+            className="reader-export-cancel"
+            onClick={cancelExport}
+            aria-label="cancelar descarga"
+          >
             ✕
           </button>
         </div>
@@ -1062,31 +1163,38 @@ export function Reader() {
         <div className="reader-transport" aria-label="reproductor">
           <button
             type="button"
+            className="reader-transport-btn"
             aria-label="fragmento anterior"
             onClick={() => playerRef.current?.previous()}
             disabled={!firstReady}
+            title="Fragmento anterior (Shift+←)"
           >
             ⏮
           </button>
           <button
             type="button"
-            className="reader-transport-seek"
+            className="reader-transport-btn reader-transport-seek"
             aria-label="retroceder 15 segundos"
             onClick={() => playerRef.current?.seekBackward(15)}
             disabled={!firstReady}
+            title="Retroceder 15 s (←)"
           >
-            −15
+            −15 s
           </button>
           <button
             type="button"
-            className="reader-transport-play"
+            className={`reader-transport-play ${isBuffering ? "reader-transport-buffering" : ""}`}
             aria-label={
               queuedPlay || playerState === "loading"
                 ? "preparando"
-                : "reproducir o pausar"
+                : isPlaying
+                  ? "pausar"
+                  : "reproducir"
             }
             onClick={playPause}
+            title="Reproducir / Pausar (Espacio)"
           >
+            <span className="reader-play-indicator" />
             {playerState === "playing"
               ? "❚❚"
               : queuedPlay || playerState === "loading"
@@ -1095,18 +1203,21 @@ export function Reader() {
           </button>
           <button
             type="button"
-            className="reader-transport-seek"
+            className="reader-transport-btn reader-transport-seek"
             aria-label="adelantar 30 segundos"
             onClick={() => playerRef.current?.seekForward(30)}
             disabled={!firstReady}
+            title="Adelantar 30 s (→)"
           >
-            +30
+            +30 s
           </button>
           <button
             type="button"
+            className="reader-transport-btn"
             aria-label="fragmento siguiente"
             onClick={() => playerRef.current?.next()}
             disabled={!firstReady}
+            title="Fragmento siguiente (Shift+→)"
           >
             ⏭
           </button>
@@ -1122,10 +1233,37 @@ export function Reader() {
           />
           <span className="reader-transport-time" aria-label="tiempo">
             {formatTime(currentTime)} / {formatTime(duration)}
+            {isPlaying && (
+              <span className="reader-transport-remaining">
+                {" · "}−{formatTimeRemaining(duration, currentTime, rate)}
+              </span>
+            )}
           </span>
-          <span className="reader-transport-rate" aria-label="velocidad">
+          <span
+            className="reader-transport-rate"
+            aria-label="velocidad"
+            title="Velocidad (Shift+↑/↓)"
+          >
             {rate}×
           </span>
+          <button
+            type="button"
+            className={`reader-transport-repeat ${repeatMode !== "off" ? "active" : ""}`}
+            onClick={() =>
+              setRepeatMode((prev) => {
+                const next: Record<string, "off" | "one" | "all"> = {
+                  off: "one",
+                  one: "all",
+                  all: "off",
+                };
+                return next[prev] ?? "off";
+              })
+            }
+            aria-label={`Repetir: ${repeatMode === "off" ? "off" : repeatMode === "one" ? "uno" : "todo"}`}
+            title={`Repetir: ${repeatMode === "off" ? "off" : repeatMode === "one" ? "uno" : "todo"} (R)`}
+          >
+            {repeatMode === "one" ? "🔂" : "🔁"}
+          </button>
           {isBuffering && (
             <span
               className="reader-buffering"
@@ -1139,6 +1277,7 @@ export function Reader() {
             className="reader-download"
             aria-label={exporting ? "cancelar descarga" : "descargar audio"}
             onClick={openExportDialog}
+            title="Descargar audio (E)"
           >
             {exporting ? "Cancelando…" : "⬇ Audio"}
           </button>
@@ -1156,7 +1295,8 @@ export function Reader() {
               title={doc?.source.name?.replace(/\.[^.]+$/, "") ?? ""}
               author=""
               onExport={(fmt, t, a) => {
-                setShowExportDialog(false);
+                // Leave the dialog open while the export runs; runExport's
+                // finally block closes it on completion/cancellation.
                 void runExport(fmt, t, a);
               }}
               onCancel={() => {

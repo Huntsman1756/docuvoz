@@ -205,6 +205,28 @@ export class BufferedSpeechPlayer {
     return this.healthPromise;
   }
 
+  /** Resolve provider metadata from engine info in the health descriptor. */
+  private async resolveProviderMeta(): Promise<ProviderMetadata | null> {
+    if (!this.engineId) return null;
+    try {
+      const health = await this.health();
+      const engine = health.engines?.find((e) => e.id === this.engineId);
+      if (!engine) return null;
+      const isEdge = engine.id === "edge" || engine.provider === "edge";
+      return {
+        name: engine.provider,
+        capabilities: {
+          supportsWordBoundaries: isEdge,
+          supportsStreaming: isEdge,
+          supportsExactDuration: true,
+          spanishQuality: isEdge,
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /* ── getters ────────────────────────────────────────────────────────── */
 
   get currentState(): BufferedPlayerState {
@@ -242,11 +264,11 @@ export class BufferedSpeechPlayer {
     return this._isRebuffering;
   }
   get supportsWordBoundaries(): boolean {
-    return (
-      this.engine?.supportsWordBoundaries ??
-      this._providerMeta?.capabilities.supportsWordBoundaries ??
-      false
-    );
+    if (this.engine?.supportsWordBoundaries) return true;
+    if (this._providerMeta?.capabilities.supportsWordBoundaries) return true;
+    // Edge TTS natively supports word boundaries
+    if (this.engineId === "edge") return true;
+    return false;
   }
   get providerMetadata(): ProviderMetadata | null {
     return this._providerMeta;
@@ -479,6 +501,11 @@ export class BufferedSpeechPlayer {
     this.engine.setTotalChunks(this.chunks.length);
     this.engine.setPlaybackRate(this.playbackRate);
 
+    // Pre-resolve provider metadata from the engine registry so capabilities
+    // (word boundaries, spanishQuality) are available before the first fetch.
+    const earlyMeta = await this.resolveProviderMeta();
+    if (earlyMeta) this._providerMeta = earlyMeta;
+
     // Propagate any already-collected word boundaries to the engine
     for (const [chunkId, boundaries] of this.chunkBoundaries) {
       const chunkIndex = this.chunks.findIndex((c) => c.id === chunkId);
@@ -641,15 +668,18 @@ export class BufferedSpeechPlayer {
     // Cache on the server for future requests
     void putCachedAudio(serverKey, blob).catch(() => {});
 
-    // Update provider metadata from response headers if available
+    // Update provider metadata from response headers if available.
+    // Capabilities are derived from the engineId or the provider name itself.
     const providerName = response.headers.get("x-provider");
     if (providerName) {
+      const isEdge = this.engineId === "edge" || providerName === "edge";
       this._providerMeta = {
         name: providerName,
         capabilities: {
-          supportsWordBoundaries: false, // Will be refined when provider exposes it
-          supportsStreaming: false,
+          supportsWordBoundaries: isEdge,
+          supportsStreaming: isEdge,
           supportsExactDuration: true,
+          spanishQuality: isEdge,
         },
       };
     }

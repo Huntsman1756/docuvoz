@@ -352,7 +352,13 @@ export class BufferedAudioEngine {
       this.opts.tailPadMs,
     );
     this.durations.set(index, buffer.duration);
-    if (!this.gaps.has(index)) {
+    // Compute the gap after this chunk based on the last spoken boundary.
+    // A small pause follows section terminators (/.!?\n/), a shorter one
+    // follows sentence separators (/,;:/), and nothing follows the final
+    // chunk (enforced in gap()).  The gaps map is populated lazily on first
+    // decode; subsequent decode calls for the same index are deduplicated by
+    // the `decoding` promise map above, so this branch runs once per chunk.
+    {
       const last = this.boundaries.get(index)?.boundaries.at(-1)?.word;
       const gap = last
         ? /[.!?\n]$/.test(last)
