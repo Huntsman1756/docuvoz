@@ -274,6 +274,7 @@ it("real player applies a rate set before engine creation and reuses blobs throu
     },
     {
       health: async () => ({
+        ok: true,
         provider: "mock",
         model: "mock",
         voice: "es",

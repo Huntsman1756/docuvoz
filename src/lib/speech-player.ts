@@ -22,6 +22,8 @@ import type { SpeechChunk } from "@/domain/spoken/types";
 import type { SpeechSettings } from "@/domain/speech/types";
 import { computeAudioCacheKey } from "@/infrastructure/cache/cache-key";
 import { getCachedAudio, putCachedAudio } from "./idb-audio-cache";
+import { WebSpeechTransport } from "./web-speech-transport";
+import type { SpeechTransport } from "./speech-transport";
 
 /** Classify intentional cancellation (destroy/abort) vs real failures. */
 export function isAbortError(error: unknown): boolean {
@@ -66,6 +68,7 @@ export interface EngineDescriptor {
 }
 
 export interface HealthDescriptor {
+  ok: boolean;
   provider: string;
   model: string;
   voice: string;
@@ -114,6 +117,7 @@ export class SpeechPlayer {
   private playbackRate: number;
   private readonly prefetchDepth: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly transport: SpeechTransport;
   private readonly voice: string | undefined;
   private readonly engine: string | undefined;
   private readonly healthLoader: () => Promise<HealthDescriptor>;
@@ -135,15 +139,12 @@ export class SpeechPlayer {
     this.playbackRate = options.playbackRate ?? 1;
     this.prefetchDepth = options.prefetchDepth ?? 2;
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
+    // Transport seam: when omitted, a Web transport is used so existing
+    // callers (and their `fetchImpl`) keep working unchanged.
+    this.transport = options.transport ?? new WebSpeechTransport(this.fetchImpl);
     this.voice = options.voice;
     this.engine = options.engine;
-    this.healthLoader =
-      options.health ??
-      (async () => {
-        const res = await this.fetchImpl("/api/health");
-        if (!res.ok) throw new Error("health_unavailable");
-        return (await res.json()) as HealthDescriptor;
-      });
+    this.healthLoader = options.health ?? (() => this.transport.health());
   }
 
   private health(): Promise<HealthDescriptor> {
@@ -447,34 +448,26 @@ export class SpeechPlayer {
       }
     }
     const started = Date.now();
-    const response = await this.fetchImpl("/api/speech", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: chunk.text,
-        ...(this.voice ? { voice: this.voice } : {}),
-        ...(this.engine ? { engine: this.engine } : {}),
-        speed: 1,
-        // No `format`: the engine decides the container (see cacheKeyFor).
-      }),
-      signal: this.instanceAbort.signal,
-    });
-    if (!response.ok) {
-      let code = "speech_error";
-      try {
-        const body = (await response.json()) as { error?: string };
-        code = body.error ?? code;
-      } catch {
-        /* ignore */
-      }
+    let result;
+    try {
+      result = await this.transport.synthesize(
+        {
+          text: chunk.text,
+          ...(this.voice ? { voice: this.voice } : {}),
+          ...(this.engine ? { engine: this.engine } : {}),
+          speed: 1,
+          // No `format`: the engine decides the container (see cacheKeyFor).
+        },
+        this.instanceAbort.signal,
+      );
+    } catch (error) {
       this.metrics.errors += 1;
       this.emitMetrics();
-      throw new Error(code);
+      throw error;
     }
-    const serverKey = response.headers.get("cache-key") ?? key ?? `ephemeral-${chunk.id}`;
-    const cacheStatus = response.headers.get("cache-status");
-    if (cacheStatus === "HIT") this.metrics.serverCacheHits += 1;
-    const blob = await response.blob();
+    const serverKey = result.cacheKey || key || `ephemeral-${chunk.id}`;
+    if (result.cacheStatus === "HIT") this.metrics.serverCacheHits += 1;
+    const blob = result.audio;
     this.metrics.requests += 1;
     this.metrics.requestLatenciesMs.push(Date.now() - started);
     this.emitMetrics();

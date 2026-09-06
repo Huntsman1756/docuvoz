@@ -23,6 +23,7 @@ import {
   type PlayerMetrics,
   type PlayerState,
 } from "@/lib/speech-player";
+import { createSpeechTransport } from "@/lib/speech-transport";
 import { loadGold, loadManifest, loadReference, type CorpusManifest } from "@/lib/corpus";
 import { DocumentList } from "./document-list";
 import { DetailPanel } from "./detail-panel";
@@ -67,8 +68,10 @@ export function Lab() {
     void loadManifest()
       .then(setCorpus)
       .catch(() => setCorpus(null));
-    fetch("/api/health")
-      .then((r) => r.json() as Promise<HealthDescriptor & { ok: boolean }>)
+    // Via the transport seam: web keeps GET /api/health; desktop proxies the
+    // sidecar's /health through the Tauri bridge (same descriptor shape).
+    createSpeechTransport()
+      .health()
       .then((h) => {
         setHealth(h);
         // Pick up diagnostics persisted by a previous parse in this session.
@@ -99,12 +102,16 @@ export function Lab() {
       playerRef.current = null;
       return;
     }
-    const player = new SpeechPlayer(chunks, {
-      onStateChange: setPlayerState,
-      onChunkChange: setChunkIndex,
-      onMetrics: setMetrics,
-      onError: (code) => setErrorText(`speech error: ${code}`),
-    });
+    const player = new SpeechPlayer(
+      chunks,
+      {
+        onStateChange: setPlayerState,
+        onChunkChange: setChunkIndex,
+        onMetrics: setMetrics,
+        onError: (code) => setErrorText(`speech error: ${code}`),
+      },
+      { transport: createSpeechTransport() },
+    );
     playerRef.current = player;
     return () => player.destroy();
   }, [chunks]);
