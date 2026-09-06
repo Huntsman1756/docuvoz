@@ -8,7 +8,7 @@ public/pdfjs/
 sidecar/dist/
 desktop/.next/
 desktop/out/
-desktop/public/pdfjs/
+desktop/public/
 src-tauri/target/
 src-tauri/gen/schemas/
 

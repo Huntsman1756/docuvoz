@@ -24,10 +24,13 @@ const eslintConfig = defineConfig([
     "evaluation/results/**",
     "playwright-report/**",
     "test-results/**",
-    // Desktop build artifacts and generated Rust/JSON:
+    // Desktop build artifacts (source under desktop/app stays linted):
     "sidecar/dist/**",
     "desktop/.next/**",
     "desktop/out/**",
+    "desktop/public/**",
+    "desktop/next-env.d.ts",
+    "desktop/tsconfig.tsbuildinfo*",
     "src-tauri/target/**",
     "src-tauri/gen/**",
   ]),
