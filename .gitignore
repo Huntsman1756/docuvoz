@@ -53,7 +53,8 @@ next-env.d.ts
 /sidecar/dist/
 /desktop/.next/
 /desktop/out/
-/desktop/public/pdfjs/
+/desktop/public/
+/desktop/tsconfig.tsbuildinfo/
 /src-tauri/target/
 /src-tauri/binaries/
 /src-tauri/gen/schemas/

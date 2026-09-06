@@ -16,6 +16,8 @@
     "sidecar:build": "node scripts/build-sidecar.mjs",
     "sidecar:package": "node scripts/package-sidecar.mjs",
     "sidecar:smoke": "node scripts/smoke-sidecar.mjs",
+    "prebuild:desktop": "node scripts/copy-desktop-public.mjs",
+    "build:desktop": "next build desktop",
     "pretest": "npm run sidecar:build",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -56,6 +58,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@tauri-apps/cli": "2.11.4",
     "@types/dompurify": "^3.0.5",
     "@types/jsdom": "^30.0.0",
     "@types/markdown-it": "^14.2.0",

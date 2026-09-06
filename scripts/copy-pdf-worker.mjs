@@ -1,9 +1,12 @@
 /**
  * Copy the pdf.js worker (and the standard-font data pdf.js needs for
- * non-embedded fonts) into /public/pdfjs so the browser extractor works with
- * stable, framework-agnostic URLs. Everything here is regenerated from
- * node_modules and is git-ignored — run via predev / prebuild, or manually
- * with `npm run setup:pdfjs`.
+ * non-embedded fonts) into a public/pdfjs directory so the browser extractor
+ * works with stable, framework-agnostic URLs. Everything here is regenerated
+ * from node_modules and is git-ignored — run via predev / prebuild, or
+ * manually with `npm run setup:pdfjs`.
+ *
+ * Optional argv[2]: destination directory (default `<root>/public/pdfjs`).
+ * The desktop static app copies its own assets with this same script.
  */
 import { copyFileSync, mkdirSync, existsSync, statSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -13,13 +16,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
 const pkg = resolve(root, "node_modules", "pdfjs-dist");
 
+const targetDir = process.argv[2]
+  ? resolve(process.argv[2])
+  : join(root, "public", "pdfjs");
+mkdirSync(targetDir, { recursive: true });
+
 if (!existsSync(pkg)) {
   console.error("[setup:pdfjs] pdfjs-dist not installed. Run `npm install` first.");
   process.exit(1);
 }
-
-const targetDir = join(root, "public", "pdfjs");
-mkdirSync(targetDir, { recursive: true });
 
 // 1. Worker.
 const workerCandidates = ["pdf.worker.min.mjs", "pdf.worker.mjs"].map((name) =>
