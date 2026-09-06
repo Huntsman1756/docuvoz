@@ -549,7 +549,9 @@ export function Reader() {
 
   /* ---- explicit reader phase (product-facing state machine) ---- */
   const firstReady = prepared >= 1 || playerState !== "idle";
-  const playable = totalChunks > 0 && rawPhase === "ready";
+  // providerReady is part of playability: without it playerRef is still null
+  // and a click would silently do nothing (raced CI failures).
+  const playable = totalChunks > 0 && rawPhase === "ready" && providerReady;
   const phase = deriveReaderPhase(
     rawPhase,
     playerState,
