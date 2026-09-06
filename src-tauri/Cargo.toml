@@ -16,6 +16,12 @@ uuid = { version = "1", features = ["v4"] }
 getrandom = "0.3"
 # Loopback HTTP only (sidecar on 127.0.0.1): no TLS features needed.
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
+# Native file dialogs + app-data JSON store (official plugins).
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+# OS credential storage for the only secret (NAN_API_KEY):
+# Windows Credential Manager / macOS Keychain. No vault password to manage.
+keyring = { version = "3", features = ["windows-native", "apple-native"] }
 
 [target.'cfg(windows)'.dependencies]
 # Job object with kill-on-close: guarantees no orphan sidecar process even if

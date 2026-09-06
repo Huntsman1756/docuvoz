@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "@/app/globals.css";
+import { DesktopGate } from "@/components/desktop-gate";
 
 export const metadata: Metadata = {
   title: "DocuVoz — Escucha tus documentos",
@@ -14,7 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <DesktopGate>{children}</DesktopGate>
+      </body>
     </html>
   );
 }

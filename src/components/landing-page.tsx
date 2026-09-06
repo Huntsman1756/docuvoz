@@ -1,7 +1,13 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { getRecentDocuments, type RecentDocument } from "@/lib/recent-documents";
+import { useCallback, useMemo, useState } from "react";
+import {
+  getRecentDocuments,
+  clearRecentPath,
+  setRecentPath,
+  computeContentFingerprint,
+  type RecentDocument,
+} from "@/lib/recent-documents";
 import { SUPPORTED_FORMATS_LABEL } from "@/adapters/document-parsers/adapter-registry";
 import type { CorpusManifest } from "@/lib/corpus";
 import {
@@ -9,9 +15,19 @@ import {
   getFileHandle,
   ensureReadPermission,
 } from "@/lib/file-handle-persistence";
+import {
+  pickDesktopDocument,
+  reopenDesktopDocument,
+  locateDesktopDocument,
+} from "@/lib/desktop-documents";
+import { isDesktop } from "@/lib/desktop-bridge";
 
 interface Props {
-  onSelectFile: (file: File, handle?: FileSystemFileHandle) => void;
+  onSelectFile: (
+    file: File,
+    handle?: FileSystemFileHandle,
+    desktopPath?: string,
+  ) => void;
   onLoadFixture?: (pdfPath: string, title: string) => void;
   corpus?: CorpusManifest | null;
   onFingerprint?: (fp: string) => void;
@@ -19,8 +35,24 @@ interface Props {
 
 const FILE_ACCEPT = ".pdf,.epub,.docx,.txt,.md,.html";
 
-/** Show the browser-native file picker when supported; otherwise fall back. */
-async function pickFile(): Promise<{ file: File; handle?: FileSystemFileHandle } | null> {
+/**
+ * Open flow per runtime:
+ *   desktop → native system dialog (Rust reads + validates) → File + path
+ *   web (Chromium)  → showOpenFilePicker (returns a handle for later reopen)
+ *   web (fallback)  → plain file input
+ */
+async function pickFile(): Promise<{
+  file: File;
+  handle?: FileSystemFileHandle;
+  desktopPath?: string;
+} | null> {
+  if (isDesktop()) {
+    try {
+      return await pickDesktopDocument();
+    } catch {
+      return null;
+    }
+  }
   if (supportsFileSystemAccess()) {
     try {
       const [handle] = await window.showOpenFilePicker({
@@ -86,9 +118,56 @@ export function LandingPage({
   onFingerprint,
 }: Props) {
   const recents = useMemo(() => getRecentDocuments(), []);
+  // Desktop: fingerprints of recents whose stored path went stale (file
+  // moved/deleted/unreadable) and now need the native "Locate file" action.
+  const [needsLocate, setNeedsLocate] = useState<string | null>(null);
+  const [locateError, setLocateError] = useState<string | null>(null);
+
+  const handleLocate = useCallback(
+    async (recent: RecentDocument) => {
+      setLocateError(null);
+      try {
+        const doc = await locateDesktopDocument(recent.path ?? "");
+        if (!doc) return; // user cancelled the dialog
+        const fingerprint = await computeContentFingerprint(doc.file);
+        if (fingerprint !== recent.fingerprint) {
+          setLocateError(
+            "El archivo seleccionado no coincide con el documento guardado. No se restauró la posición.",
+          );
+          return;
+        }
+        setRecentPath(recent.fingerprint, doc.path);
+        setNeedsLocate(null);
+        onFingerprint?.(recent.fingerprint);
+        onSelectFile(doc.file, undefined, doc.path);
+      } catch {
+        setLocateError("No se pudo abrir el archivo indicado.");
+      }
+    },
+    [onSelectFile, onFingerprint],
+  );
 
   const handleResume = useCallback(
     async (recent: RecentDocument) => {
+      // Desktop: reopen through the stored safe path, verifying the content
+      // fingerprint before any position restore. Never silently restore a
+      // different file.
+      if (isDesktop()) {
+        setLocateError(null);
+        if (recent.path) {
+          const result = await reopenDesktopDocument(recent.path, recent.fingerprint);
+          if (result.ok) {
+            onFingerprint?.(recent.fingerprint);
+            onSelectFile(result.doc.file, undefined, result.doc.path);
+            return;
+          }
+          // Stale or wrong content: clear the actionable path reference and
+          // offer the native locate action.
+          clearRecentPath(recent.fingerprint);
+        }
+        setNeedsLocate(recent.fingerprint);
+        return;
+      }
       // Prefer a persisted browser handle (Chromium File System Access).
       if (supportsFileSystemAccess()) {
         const handle = await getFileHandle(recent.fingerprint);
@@ -189,24 +268,42 @@ export function LandingPage({
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="reader-recent-resume"
-                    onClick={() => handleResume(recent)}
-                    aria-label={`Reanudar ${recent.filename}`}
-                    disabled={!hasPosition}
-                    title={
-                      hasPosition
-                        ? `Reanudar desde ${recent.lastSection || "el inicio"}`
-                        : "Sin posición guardada"
-                    }
-                  >
-                    {hasPosition ? "Reanudar" : "Cargar"}
-                  </button>
+                  {isDesktop() &&
+                  (needsLocate === recent.fingerprint || !recent.path) ? (
+                    <button
+                      type="button"
+                      className="reader-recent-resume"
+                      onClick={() => void handleLocate(recent)}
+                      aria-label={`Ubicar archivo de ${recent.filename}`}
+                      title="El archivo no está disponible; búscalo en su nueva ubicación"
+                    >
+                      Ubicar archivo…
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="reader-recent-resume"
+                      onClick={() => handleResume(recent)}
+                      aria-label={`Reanudar ${recent.filename}`}
+                      disabled={!hasPosition}
+                      title={
+                        hasPosition
+                          ? `Reanudar desde ${recent.lastSection || "el inicio"}`
+                          : "Sin posición guardada"
+                      }
+                    >
+                      {hasPosition ? "Reanudar" : "Cargar"}
+                    </button>
+                  )}
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          {locateError && (
+            <p className="reader-error" role="alert">
+              {locateError}
+            </p>
+          )}
         </div>
       )}
     </section>

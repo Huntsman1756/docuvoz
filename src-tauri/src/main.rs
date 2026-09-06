@@ -24,6 +24,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{Manager, RunEvent, State};
 
+mod desktop;
+
 /// Bounded startup wait for the sidecar's READY line.
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 /// Backstop for a full synthesis request; the sidecar enforces its own 60s
@@ -44,6 +46,7 @@ struct AppState {
     http: reqwest::Client,
     sidecar_binary: PathBuf,
     cache_dir: PathBuf,
+    app: tauri::AppHandle,
 }
 
 impl AppState {
@@ -59,7 +62,7 @@ impl AppState {
             if guard.take().is_some() {
                 eprintln!("docuvoz-speech died; attempting one restart");
             }
-            let sidecar = spawn_sidecar(&self.sidecar_binary, &self.cache_dir)?;
+            let sidecar = spawn_sidecar(&self.app, &self.sidecar_binary, &self.cache_dir)?;
             *guard = Some(sidecar);
         }
         let s = guard.as_ref().ok_or("sidecar_unavailable")?;
@@ -73,7 +76,11 @@ fn hex_token() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn spawn_sidecar(binary: &PathBuf, cache_dir: &PathBuf) -> Result<Sidecar, String> {
+fn spawn_sidecar(
+    app: &tauri::AppHandle,
+    binary: &PathBuf,
+    cache_dir: &PathBuf,
+) -> Result<Sidecar, String> {
     std::fs::create_dir_all(cache_dir).map_err(|e| format!("cache_dir: {e}"))?;
     let token = hex_token();
     let mut command = Command::new(binary);
@@ -83,7 +90,18 @@ fn spawn_sidecar(binary: &PathBuf, cache_dir: &PathBuf) -> Result<Sidecar, Strin
         .env("SPEECH_CACHE_DIR", cache_dir)
         .env_remove("SPEECH_PROVIDER")
         .env_remove("NAN_BASE_URL")
-        .env_remove("NAN_API_KEY")
+        .env_remove("NAN_API_KEY");
+    // Real standard engine: only when the user configured both the endpoint
+    // (non-secret, in app-data settings) and the API key (OS keyring).
+    // Otherwise the default engine stays mock and Edge is the only real
+    // voice — a missing key must never silently become a Mock substitute
+    // pretending to be a real provider.
+    if let (Some(key), Some(url)) = (desktop::nan_api_key(), desktop::nan_base_url(app)) {
+        command.env("SPEECH_PROVIDER", "nan");
+        command.env("NAN_BASE_URL", url);
+        command.env("NAN_API_KEY", key);
+    }
+    command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -248,6 +266,8 @@ fn kill_sidecar(state: &AppState) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
             let dir = exe.parent().ok_or("no exe dir")?;
@@ -273,20 +293,30 @@ fn main() {
                 .path()
                 .app_cache_dir()?
                 .join("speech-cache");
-            let sidecar = spawn_sidecar(&sidecar_binary, &cache_dir)
+            let handle = app.handle().clone();
+            let sidecar = spawn_sidecar(&handle, &sidecar_binary, &cache_dir)
                 .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
             app.manage(AppState {
                 sidecar: Mutex::new(Some(sidecar)),
                 http: reqwest::Client::new(),
                 sidecar_binary,
                 cache_dir,
+                app: handle,
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             speech_health,
             speech,
-            speech_cancel
+            speech_cancel,
+            desktop::desktop_pick_document,
+            desktop::desktop_locate_document,
+            desktop::desktop_read_document,
+            desktop::desktop_state_load,
+            desktop::desktop_state_save,
+            desktop::desktop_nan_key_configured,
+            desktop::desktop_set_nan_key,
+            desktop::desktop_clear_nan_key
         ])
         .build(tauri::generate_context!())
         .expect("tauri application failed to initialize")

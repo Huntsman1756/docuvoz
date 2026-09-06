@@ -13,6 +13,11 @@
  * - No fallback for missing hash: documents without SHA-256 cannot be resumed
  */
 import type { StructuredDocument } from "@/domain/documents/types";
+import {
+  desktopStateGet,
+  desktopStateSet,
+} from "./desktop-app-state";
+import { isDesktop } from "./desktop-bridge";
 
 const STORAGE_KEY = "auidionan-recent";
 const MAX_RECENT = 5;
@@ -40,6 +45,12 @@ export interface RecentDocument {
   lastOpened: number;
   /** Number of times resumed. */
   resumeCount: number;
+  /**
+   * Desktop only: safe local path reference for native reopen. The web build
+   * never stores paths (it uses browser file handles instead); desktop
+   * reopen always verifies the content fingerprint before restoring.
+   */
+  path?: string;
 }
 
 function isRecentDocument(obj: unknown): obj is RecentDocument {
@@ -66,19 +77,48 @@ export async function computeContentFingerprint(file: File): Promise<string> {
     .join("");
 }
 
-/**
- * Get all recent documents, sorted by last opened time.
- */
-export function getRecentDocuments(): RecentDocument[] {
+/* Storage backend: desktop keeps continuity state in OS app-data (hydrated
+ * mirror); the web build keeps localStorage. Same shapes, same semantics. */
+function readRecentsRaw(): RecentDocument[] {
+  if (isDesktop()) {
+    const stored = desktopStateGet("recents");
+    return Array.isArray(stored) ? (stored as unknown[]).filter(isRecentDocument) : [];
+  }
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
     const parsed = JSON.parse(stored) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isRecentDocument).sort((a, b) => b.lastOpened - a.lastOpened);
+    return parsed.filter(isRecentDocument);
   } catch {
     return [];
   }
+}
+
+function writeRecentsRaw(recents: RecentDocument[]): void {
+  if (isDesktop()) {
+    desktopStateSet("recents", recents);
+    return;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(recents));
+  } catch {
+    // localStorage may be full - try removing oldest
+    if (recents.length > 1) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(recents.slice(0, -1)));
+      } catch {
+        // Give up silently
+      }
+    }
+  }
+}
+
+/**
+ * Get all recent documents, sorted by last opened time.
+ */
+export function getRecentDocuments(): RecentDocument[] {
+  return readRecentsRaw().sort((a, b) => b.lastOpened - a.lastOpened);
 }
 
 /**
@@ -91,6 +131,7 @@ export function addRecentDocument(
   position: Partial<
     Pick<RecentDocument, "lastSection" | "lastPosition" | "lastDocTime" | "playbackSpeed">
   >,
+  origin?: { path?: string },
 ): RecentDocument {
   const recents = getRecentDocuments();
 
@@ -119,6 +160,9 @@ export function addRecentDocument(
     playbackSpeed: position.playbackSpeed ?? existing?.playbackSpeed,
     lastOpened: Date.now(),
     resumeCount: (existing?.resumeCount ?? 0) + 1,
+    // Desktop safe path reference (web build never stores paths); carried
+    // over unless explicitly replaced.
+    path: isDesktop() ? (origin?.path ?? existing?.path) : undefined,
   };
 
   // Remove if exists, then add to front
@@ -128,20 +172,7 @@ export function addRecentDocument(
   recents.unshift(entry);
 
   // Keep only MAX_RECENT
-  const trimmed = recents.slice(0, MAX_RECENT);
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-  } catch {
-    // localStorage may be full - try removing oldest
-    if (trimmed.length > 1) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed.slice(0, -1)));
-      } catch {
-        // Give up silently
-      }
-    }
-  }
+  writeRecentsRaw(recents.slice(0, MAX_RECENT));
 
   return entry;
 }
@@ -166,11 +197,7 @@ export function updateRecentPosition(
     lastOpened: Date.now(),
   };
 
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(recents));
-  } catch {
-    // Silently fail
-  }
+  writeRecentsRaw(recents);
 }
 
 /**
@@ -179,11 +206,31 @@ export function updateRecentPosition(
 export function removeRecentDocument(fingerprint: string): void {
   const recents = getRecentDocuments();
   const filtered = recents.filter((r) => r.fingerprint !== fingerprint);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  } catch {
-    // Silently fail
-  }
+  writeRecentsRaw(filtered);
+}
+
+/**
+ * Desktop only: record the (verified) local path for an existing entry.
+ */
+export function setRecentPath(fingerprint: string, path: string): void {
+  const recents = getRecentDocuments();
+  const index = recents.findIndex((r) => r.fingerprint === fingerprint);
+  if (index < 0) return;
+  recents[index] = { ...recents[index], path, lastOpened: Date.now() };
+  writeRecentsRaw(recents);
+}
+
+/**
+ * Desktop only: clear a stale path reference (file moved/deleted/unreadable)
+ * while keeping the position metadata, so the UI can offer "Locate file".
+ */
+export function clearRecentPath(fingerprint: string): void {
+  const recents = getRecentDocuments();
+  const index = recents.findIndex((r) => r.fingerprint === fingerprint);
+  if (index < 0) return;
+  const entry: RecentDocument = { ...recents[index], path: undefined, lastOpened: Date.now() };
+  recents[index] = entry;
+  writeRecentsRaw(recents);
 }
 
 /**

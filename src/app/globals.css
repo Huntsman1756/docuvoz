@@ -687,6 +687,61 @@ pre code {
   margin-top: 6px;
 }
 
+/* Desktop-only optional NaN service configuration (app-data + OS keyring). */
+.reader-nan-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.reader-nan-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reader-nan-config input {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.reader-nan-config input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(90, 156, 255, 0.2);
+}
+
+.reader-nan-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.reader-nan-actions button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.reader-nan-notice {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .reader-settings-toggle {
   background: none;
   border: none;

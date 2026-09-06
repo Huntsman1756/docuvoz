@@ -7,11 +7,27 @@
  * Privacy: Only metadata is stored (no document content).
  */
 import { openDB, type IDBPDatabase } from "idb";
+import { desktopStateGet, desktopStateSet } from "./desktop-app-state";
+import { isDesktop } from "./desktop-bridge";
 
 const DB_NAME = "auidionan-position";
 const STORE = "positions";
 const MAX_AGE_DAYS = 90;
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 3600 * 1000;
+
+function isExpired(record: SavedPosition): boolean {
+  return record.savedAt != null && Date.now() - record.savedAt > MAX_AGE_MS;
+}
+
+/* Desktop backend: the fingerprint -> position map lives in the app-data
+ * mirror (see desktop-app-state.ts); semantics (expiry, no content) match
+ * the web IndexedDB store exactly. The web build never reaches here. */
+function desktopPositions(): Record<string, SavedPosition> {
+  const raw = desktopStateGet("positions");
+  return raw != null && typeof raw === "object"
+    ? (raw as Record<string, SavedPosition>)
+    : {};
+}
 
 export interface SavedPosition {
   /** Document fingerprint (matches RecentDocument.fingerprint). */
@@ -53,6 +69,12 @@ function db(): Promise<IDBPDatabase> {
  */
 export async function savePosition(position: SavedPosition): Promise<void> {
   try {
+    if (isDesktop()) {
+      const map = desktopPositions();
+      map[position.fingerprint] = { ...position, savedAt: Date.now() };
+      desktopStateSet("positions", map);
+      return;
+    }
     await (await db()).put(STORE, { ...position, savedAt: Date.now() });
   } catch {
     // Position saves must never break playback
@@ -65,6 +87,11 @@ export async function savePosition(position: SavedPosition): Promise<void> {
  */
 export async function loadPosition(fingerprint: string): Promise<SavedPosition | null> {
   try {
+    if (isDesktop()) {
+      const record = desktopPositions()[fingerprint];
+      if (!record) return null;
+      return isExpired(record) ? null : record;
+    }
     const record = (await (await db()).get(STORE, fingerprint)) as
       SavedPosition | undefined;
     if (!record) return null;
@@ -80,6 +107,14 @@ export async function loadPosition(fingerprint: string): Promise<SavedPosition |
  */
 export async function removePosition(fingerprint: string): Promise<void> {
   try {
+    if (isDesktop()) {
+      const map = desktopPositions();
+      if (fingerprint in map) {
+        delete map[fingerprint];
+        desktopStateSet("positions", map);
+      }
+      return;
+    }
     await (await db()).delete(STORE, fingerprint);
   } catch {
     // Silently fail

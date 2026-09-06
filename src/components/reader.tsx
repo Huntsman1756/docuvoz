@@ -48,12 +48,28 @@ import {
 } from "@/lib/position-persistence";
 import { storeFileHandle } from "@/lib/file-handle-persistence";
 import { createSpeechTransport } from "@/lib/speech-transport";
+import { isDesktop, desktopInvoke } from "@/lib/desktop-bridge";
+import {
+  desktopStateGet,
+  desktopStateSet,
+} from "@/lib/desktop-app-state";
 import { LandingPage } from "@/components/landing-page";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
 const MIN_CHUNK_CHARS = 200;
 /** Spanish narration cadence, for the listen-time estimate only. */
 const CHARS_PER_MINUTE = 840;
+
+/**
+ * Desktop-only preference read (app-data mirror, hydrated by DesktopGate
+ * before render — so lazy state initializers see the stored value).
+ * Returns undefined on the web build.
+ */
+function readDesktopPref(key: string): unknown {
+  if (!isDesktop()) return undefined;
+  const saved = desktopStateGet("settings") as Record<string, unknown> | undefined;
+  return saved?.[key];
+}
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return "00:00";
@@ -81,11 +97,27 @@ export function Reader() {
     "empty" | "loading" | "extracting" | "ready" | "error"
   >("empty");
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [mode, setMode] = useState<SpokenMode>("listen");
-  const [langChoice, setLangChoice] = useState<"auto" | Lang>("auto");
-  const [engineChoice, setEngineChoice] = useState<EngineChoice>("auto");
-  const [voice, setVoice] = useState<string>(() => defaultVoice("es", "default"));
-  const [rate, setRate] = useState(1);
+  const [mode, setMode] = useState<SpokenMode>(() => {
+    const v = readDesktopPref("mode");
+    return v === "listen" || v === "literal" ? v : "listen";
+  });
+  const [langChoice, setLangChoice] = useState<"auto" | Lang>(() => {
+    const v = readDesktopPref("langChoice");
+    return v === "auto" || v === "es" || v === "en" ? v : "auto";
+  });
+  const [engineChoice, setEngineChoice] = useState<EngineChoice>(() => {
+    const v = readDesktopPref("engineChoice");
+    // Availability is normalized later by resolveEngine() when unavailable.
+    return v === "auto" || v === "default" || v === "edge" ? v : "auto";
+  });
+  const [voice, setVoice] = useState<string>(() => {
+    const v = readDesktopPref("voice");
+    return typeof v === "string" && v ? v : defaultVoice("es", "default");
+  });
+  const [rate, setRate] = useState(() => {
+    const v = readDesktopPref("rate");
+    return typeof v === "number" && RATES.includes(v) ? v : 1;
+  });
   const rateRef = useRef(rate);
   const [playerState, setPlayerState] = useState<BufferedPlayerState>("idle");
   const [chunkIndex, setChunkIndex] = useState(0);
@@ -106,6 +138,18 @@ export function Reader() {
   // Provider metadata from /api/health has resolved; only then do we build the
   // player so "auto" resolves once to its final engine/voice (no rebuild churn).
   const [providerReady, setProviderReady] = useState(false);
+  // Desktop-only: NAN service configuration (URL non-secret in app-data,
+  // key in the OS keyring — never rendered back).
+  const [nanConfigured, setNanConfigured] = useState<boolean | null>(null);
+  const [nanBaseUrl, setNanBaseUrl] = useState(() => {
+    const v = readDesktopPref("nanBaseUrl");
+    return typeof v === "string" ? v : "";
+  });
+  const [nanKeyInput, setNanKeyInput] = useState("");
+  const [nanNotice, setNanNotice] = useState<string | null>(null);
+  // AUTO fallback (Edge unavailable → real standard engine, once, with notice).
+  const [edgeNotice, setEdgeNotice] = useState<string | null>(null);
+  const edgeFallbackUsedRef = useRef(false);
 
   // Recent documents and position persistence
   const [fingerprint, setFingerprint] = useState<string | null>(null);
@@ -119,6 +163,7 @@ export function Reader() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSegRef = useRef<HTMLParagraphElement | null>(null);
   const positionRestoredRef = useRef(false);
+  const enginesRef = useRef<EngineDescriptor[]>([]);
 
   /* ---- current time position (seconds) ---- */
   const [currentTime, setCurrentTime] = useState(0);
@@ -129,14 +174,64 @@ export function Reader() {
     void loadManifest()
       .then(setCorpus)
       .catch(() => setCorpus(null));
-    void fetch("/api/health")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body: { engines?: EngineDescriptor[] } | null) =>
-        setEngines(body?.engines?.filter((e) => e.id in ENGINES) ?? []),
-      )
+    // Through the transport seam: the web build keeps GET /api/health; the
+    // desktop build proxies the sidecar's /health through the Tauri bridge.
+    void createSpeechTransport()
+      .health()
+      .then((body) => setEngines(body.engines?.filter((e) => e.id in ENGINES) ?? []))
       .catch(() => setEngines([]))
       .finally(() => setProviderReady(true));
   }, []);
+
+  /* ---- desktop: keyring state for the optional NaN service ---- */
+  useEffect(() => {
+    if (!isDesktop()) return;
+    let live = true;
+    void desktopInvoke<boolean>("desktop_nan_key_configured")
+      .then((v) => {
+        if (live) setNanConfigured(v);
+      })
+      .catch(() => {
+        if (live) setNanConfigured(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const saveDesktopSetting = useCallback((patch: Record<string, unknown>) => {
+    if (!isDesktop()) return;
+    const current = (desktopStateGet("settings") as Record<string, unknown>) ?? {};
+    desktopStateSet("settings", { ...current, ...patch });
+  }, []);
+
+  const handleNanSave = useCallback(async () => {
+    setNanNotice(null);
+    try {
+      if (nanKeyInput.trim().length > 0) {
+        await desktopInvoke("desktop_set_nan_key", { key: nanKeyInput.trim() });
+      }
+      saveDesktopSetting({ nanBaseUrl: nanBaseUrl.trim() });
+      setNanConfigured(true);
+      setNanKeyInput("");
+      setNanNotice("Guardado. Se aplicará la próxima vez que inicies DocuVoz.");
+    } catch {
+      setNanNotice("No se pudo guardar la clave.");
+    }
+  }, [nanKeyInput, nanBaseUrl, saveDesktopSetting]);
+
+  const handleNanClear = useCallback(async () => {
+    setNanNotice(null);
+    try {
+      await desktopInvoke("desktop_clear_nan_key");
+      saveDesktopSetting({ nanBaseUrl: "" });
+      setNanBaseUrl("");
+      setNanConfigured(false);
+      setNanNotice("Clave eliminada. Se aplicará la próxima vez que inicies DocuVoz.");
+    } catch {
+      setNanNotice("No se pudo eliminar la clave.");
+    }
+  }, [saveDesktopSetting]);
 
   /* ---- document text for language detection ---- */
   const docText = useMemo(
@@ -146,6 +241,10 @@ export function Reader() {
   const effLang: Lang =
     langChoice === "auto" ? (doc ? detectLanguage(docText) : "es") : langChoice;
   const availableEngines = useMemo(() => engines.map((e) => e.id as EngineId), [engines]);
+
+  useEffect(() => {
+    enginesRef.current = engines;
+  }, [engines]);
   const engineId = resolveEngine(engineChoice, effLang, availableEngines);
   const voices = voicesFor(effLang, engineId);
   const activeVoice = voices.some((v) => v.id === voice)
@@ -216,6 +315,18 @@ export function Reader() {
     [plan, chunks, doc],
   );
 
+  /* ---- desktop preference persistence (app-data, desktop only) ---- */
+  const firstPersistRef = useRef(true);
+  useEffect(() => {
+    if (!isDesktop()) return;
+    // Skip the mount run: initial values come from the mirror (or defaults).
+    if (firstPersistRef.current) {
+      firstPersistRef.current = false;
+      return;
+    }
+    saveDesktopSetting({ engineChoice, voice, rate, mode, langChoice });
+  }, [engineChoice, voice, rate, mode, langChoice, saveDesktopSetting]);
+
   /* ---- player lifecycle ---- */
   useEffect(() => {
     playerRef.current?.destroy();
@@ -248,6 +359,24 @@ export function Reader() {
           setDuration(dur);
         },
         onError: (code) => {
+          // AUTO fallback: Edge unavailable → switch once to a REAL standard
+          // engine (never mock) and surface a small user-visible notice.
+          if (
+            code === "speech_error" &&
+            engineChoice === "auto" &&
+            engineId === "edge" &&
+            !edgeFallbackUsedRef.current
+          ) {
+            const standard = enginesRef.current.find((e) => e.id === "default");
+            if (standard && standard.provider !== "mock") {
+              edgeFallbackUsedRef.current = true;
+              setEngineChoice("default");
+              setEdgeNotice(
+                "La voz Edge no responde; se usará la voz estándar para este documento.",
+              );
+              return;
+            }
+          }
           if (code === "prepare_failed") {
             setPrep((p) => ({
               sig,
@@ -278,7 +407,7 @@ export function Reader() {
     );
     playerRef.current = player;
     return () => player.destroy();
-  }, [chunks, activeVoice, engineId, playerSig, providerReady]);
+  }, [chunks, activeVoice, engineId, playerSig, providerReady, engineChoice]);
 
   useEffect(() => {
     rateRef.current = rate;
@@ -322,6 +451,8 @@ export function Reader() {
     playerRef.current = null;
     pendingPlayRef.current = false;
     positionRestoredRef.current = false;
+    edgeFallbackUsedRef.current = false;
+    setEdgeNotice(null);
     setQueuedPlay(false);
     setPlayerState("idle");
     setChunkIndex(0);
@@ -333,16 +464,24 @@ export function Reader() {
   }, []);
 
   const analyzeFile = useCallback(
-    async (file: File, gen: number, handle?: FileSystemFileHandle) => {
+    async (
+      file: File,
+      gen: number,
+      origin?: {
+        handle?: FileSystemFileHandle;
+        desktopPath?: string;
+      },
+    ) => {
       if (gen !== genRef.current) return;
       setRawPhase("loading");
       try {
         const fp = await computeContentFingerprint(file);
         if (gen !== genRef.current) return;
         setFingerprint(fp);
-        // Persist a browser file handle (Chromium) so the document can be
-        // reopened directly later; best-effort and never mandatory.
-        if (handle) void storeFileHandle(fp, handle);
+        // Persist a browser file handle (Chromium web) so the document can be
+        // reopened directly later; best-effort and never mandatory. Desktop
+        // stores a verified local path on the recent entry instead.
+        if (origin?.handle) void storeFileHandle(fp, origin.handle);
 
         setRawPhase("extracting");
         const resolved = await resolveAdapter(file);
@@ -362,7 +501,7 @@ export function Reader() {
         });
         if (gen !== genRef.current) return;
 
-        addRecentDocument(extracted, fp, {});
+        addRecentDocument(extracted, fp, {}, { path: origin?.desktopPath });
 
         const saved = await loadPosition(fp);
         setSavedPosition(saved);
@@ -381,7 +520,13 @@ export function Reader() {
   );
 
   const onFile = useCallback(
-    async (file: File, handle?: FileSystemFileHandle) => {
+    async (
+      file: File,
+      origin?: {
+        handle?: FileSystemFileHandle;
+        desktopPath?: string;
+      },
+    ) => {
       const gen = beginLoad();
       setRawPhase("loading");
       const invalid = validateDocumentFile(file);
@@ -396,7 +541,7 @@ export function Reader() {
         );
         return;
       }
-      await analyzeFile(file, gen, handle);
+      await analyzeFile(file, gen, origin);
     },
     [analyzeFile, beginLoad],
   );
@@ -853,7 +998,9 @@ export function Reader() {
       {/* ——— Empty state ——— */}
       {phase === "empty" && (
         <LandingPage
-          onSelectFile={(file, handle) => void onFile(file, handle)}
+          onSelectFile={(file, handle, desktopPath) =>
+            void onFile(file, { handle, desktopPath })
+          }
           onLoadFixture={(path, title) => void loadFixture(path, title)}
           corpus={corpus}
           onFingerprint={(fp) => setFingerprint(fp)}
@@ -1034,6 +1181,42 @@ export function Reader() {
                       ))}
                     </select>
                   </label>
+                  {isDesktop() && (
+                    <div className="reader-nan-config">
+                      <label>
+                        <span>Servicio NaN — URL (opcional)</span>
+                        <input
+                          type="text"
+                          aria-label="URL del servicio NaN"
+                          value={nanBaseUrl}
+                          placeholder="https://…"
+                          onChange={(e) => setNanBaseUrl(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>Servicio NaN — clave (se guarda en el gestor de credenciales del sistema)</span>
+                        <input
+                          type="password"
+                          aria-label="clave del servicio NaN"
+                          value={nanKeyInput}
+                          placeholder={nanConfigured ? "••••••••" : ""}
+                          autoComplete="off"
+                          onChange={(e) => setNanKeyInput(e.target.value)}
+                        />
+                      </label>
+                      <div className="reader-nan-actions">
+                        <button type="button" onClick={() => void handleNanSave()}>
+                          Guardar
+                        </button>
+                        {nanConfigured && (
+                          <button type="button" onClick={() => void handleNanClear()}>
+                            Eliminar clave
+                          </button>
+                        )}
+                      </div>
+                      {nanNotice && <p className="reader-nan-notice">{nanNotice}</p>}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1053,6 +1236,11 @@ export function Reader() {
             <p className="reader-status" aria-live="polite">
               {exporting ? `Preparando la descarga · ${exportPct} %` : statusText}
             </p>
+            {edgeNotice && (
+              <p className="reader-note" role="status">
+                {edgeNotice}
+              </p>
+            )}
             <div
               className="reader-bar"
               role="progressbar"
