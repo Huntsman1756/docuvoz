@@ -34,6 +34,10 @@ for (const rel of tracked) {
 console.log(`[desktop:public] copied ${copied} tracked public file(s)`);
 
 // pdf.js worker + standard fonts (regenerated from node_modules).
-execFileSync(process.execPath, [join(root, "scripts", "copy-pdf-worker.mjs"), destRoot], {
-  stdio: "inherit",
-});
+execFileSync(
+  process.execPath,
+  [join(root, "scripts", "copy-pdf-worker.mjs"), join(destRoot, "pdfjs")],
+  {
+    stdio: "inherit",
+  },
+);
