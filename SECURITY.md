@@ -30,12 +30,17 @@ The security model is deliberately narrow (see also [docs/privacy.md](docs/priva
   server-side adapter is the only code that knows provider credentials.
   Responses contain stable error codes only — no stack traces, provider
   bodies, or credentials.
-- **Documents stay client-side.** PDF parsing happens in the browser with
-  pdf.js. Only short, fidelity-validated _spoken text chunks_ are sent to the
-  synthesis endpoint.
+- **Documents stay client-side.** Document parsing happens entirely in the
+  browser (PDF via pdf.js; EPUB/DOCX/TXT/Markdown/HTML via the document
+  adapters). Only short, fidelity-validated _spoken text chunks_ are sent to
+  the synthesis endpoint.
 - **Input validation at every boundary.** Request bodies are schema-validated
-  (zod) with caps on text length and body size; uploaded files are checked for
-  MIME/name/magic bytes and a 25 MB size limit before parsing.
+  (zod) with caps on text length and body size. Uploaded files are checked for
+  a non-empty file, a 50 MB size limit, and an allowed extension/MIME type
+  before parsing. The document adapter dispatch then sniffs the content type
+  (first bytes) to select the parser. There is no separate magic-byte
+  validation gate; the size/extension/MIME check is the client-side guard,
+  and format trust comes from that plus the adapter's own sniffing.
 - **Rate limiting.** `/api/speech` is per-client rate limited; the provider
   adapter enforces pacing, bounded retries with backoff and timeouts so
   failures cannot pile up.

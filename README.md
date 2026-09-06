@@ -1,129 +1,95 @@
-# AUIDIO NAN — document-to-audio reading laboratory
+# AUIDIO NAN — DocuVoz, a document-to-audio reader
 
-**Status: Phase 0 research prototype.** Not a product, not a hosted service.
-License: [MIT](LICENSE)
+**AUIDIO NAN** (product name: **DocuVoz**) is an audio-first document reader.
+It turns PDF, EPUB, DOCX, TXT, Markdown, and HTML documents into spoken audio
+that you can listen to, control, resume, and export — on desktop and mobile.
 
-## What this is
+License: [Apache-2.0](LICENSE)
 
-A web-first engineering laboratory for one hypothesis:
+## What it does
 
-> Documents are written to be seen, not heard. A **deterministic spoken
-> representation** can make difficult documents significantly easier to
-> understand while listening — without changing their meaning.
+- **Multi-format ingestion** — PDF, EPUB, DOCX, TXT, Markdown, and HTML are
+  parsed locally in the browser. Maximum upload size: **50 MB**.
+- **Audio-first reading** — press Play and the reader narrates the document.
+  The source text is shown alongside playback, with the current segment
+  highlighted and auto-scrolled.
+- **Transport controls** — play/pause, previous/next fragment, seek
+  forward/backward (30 s / 15 s), a seek bar, and a listen-time estimate.
+- **Resume** — your position in each document is remembered (per browser
+  profile) so you can pick up where you left off.
+- **Repeat** — repeat the current fragment or the whole document
+  (off / one / all).
+- **Playback speed** — 0.75× to 2×.
+- **Keyboard shortcuts** — Space (play/pause), `←`/`→` (seek),
+  `Shift+←`/`Shift+→` (previous/next fragment), `Shift+↑`/`Shift+↓` (speed),
+  `R` (repeat), `E` (export).
+- **Export** — download the narrated document as **WAV**, **MP3**, or
+  **M4A**.
+- **Mobile support** — responsive layout for phones and small screens.
+- **Spanish & English** — language can be auto-detected or chosen, and
+  voices/engines are selected per language.
 
-Phase 0 targets **Spanish financial and regulatory documents** (BOE, CNMV,
-Banco de España, EUR-Lex style text): articles, nested numbering, deadlines,
-percentages, EUR amounts, basis points, ISIN/LEI codes, T+2 settlement.
+## Speech engines
 
-## What this is NOT
+Synthesis is driven by a server-side provider; the browser only ever sees an
+opaque engine id. The default engine is a **local mock** (deterministic WAV,
+no network) used for offline work and tests, or **NaN/Kokoro** when you set
+`SPEECH_PROVIDER=nan`. An optional **Edge TTS** engine (free Microsoft neural
+voices, strong Spanish) can be enabled with `EDGE_TTS_ENABLED=true`.
 
-- **Not** a generic TTS reader — the transformation layer is the product idea.
-- **Not** an LLM summarizer. There is no semantic rewriting anywhere.
-- **Not** production infrastructure: the NaN/Kokoro API is wired in purely as
-  **development/validation infrastructure** behind a provider abstraction
-  ([ADR-002](docs/decisions/ADR-002-nan-is-validation-infrastructure.md),
-  [docs/providers.md](docs/providers.md)).
-- **Not** a finished app: the UI is a laboratory instrument, deliberately plain.
+```bash
+# .env.local — default is mock, no credentials needed
+SPEECH_PROVIDER=nan            # optional: use NaN/Kokoro instead of mock
+NAN_BASE_URL=https://<endpoint>/v1
+NAN_API_KEY=<server-only; never reaches the browser>
+NAN_TTS_MODEL=kokoro
+NAN_TTS_VOICE=<a Spanish-capable voice>
+EDGE_TTS_ENABLED=true          # optional second engine (Edge TTS)
+```
 
-## Three modes (and one that does not exist yet)
+See [docs/providers.md](docs/providers.md) for the provider contract and the
+terms you must review before using NaN/Kokoro with anything beyond personal
+validation.
 
-| Mode            | Engine              | Guarantees                                                                                                                                                                                                            |
-| --------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Literal**     | none                | reads the document verbatim (baseline)                                                                                                                                                                                |
-| **Listen**      | deterministic rules | verbalizes numbers/dates/money/legal refs, mutes page chrome, **never** rewrites meaning; every transformation fidelity-validated with safe fallback ([ADR-004](docs/decisions/ADR-004-deterministic-listen-mode.md)) |
-| **Manual Gold** | human hands         | manually authored spoken text used _only_ as the experimental upper bound (gate G3a)                                                                                                                                  |
-| ~~Adapted~~     | LLM                 | **intentionally not implemented**; architecture reserves the slot, opt-in and separated from Listen                                                                                                                   |
+## Privacy
 
-The experiment measures Literal → Manual Gold (how much improvement exists)
-and Manual Gold → Listen (how much the rules engine captures).
-
-## Every spoken word is traceable
-
-Each spoken segment carries span-level provenance — document, page, block ids,
-bbox, exact source text, every applied rule and its inputs/outputs
-([ADR-005](docs/decisions/ADR-005-span-level-provenance.md)). We keep three
-properties strictly separate and never claim more than we verify:
-**TRACEABLE** (provenance exists) ≠ **PRESERVED** (critical literals survive,
-machine-checked) ≠ **SEMANTICALLY FAITHFUL** (humans must judge).
-
-## Privacy by construction
-
-The PDF never leaves the browser: parsing happens locally with pdf.js. Only
-short, already-normalized _spoken chunks_ go to your own server endpoint, and
-only from there onward to the configured TTS provider. With the default
-`mock` provider, **no network at all**. Full details:
-[docs/privacy.md](docs/privacy.md).
+Document parsing happens entirely in the browser. The original document never
+leaves the browser: only short, already-normalized **spoken chunks** go to
+your own `/api/speech` endpoint, and from there to the configured TTS
+provider. **No document text is sent to a TTS provider until you press Play
+(or start an export).** With the default `mock` provider there is **no
+network call at all**. Full details: [docs/privacy.md](docs/privacy.md).
 
 ## Quick start
 
-Requires Node 24 LTS, minimum 24.15.0 (supported range: 24.x). npm is the only supported package manager.
-
-Use a 64-bit Node installation. Windows ia32 is unsupported: its optional locked
-Sharp binary requires Node 20, incompatible with the locked jsdom requirement.
-CI pins 24.15.0 and installs with `npm ci --engine-strict`.
+Requires Node 24 LTS, minimum 24.15.0 (supported range: 24.x). npm is the
+only supported package manager. Use a 64-bit Node installation; Windows ia32
+is unsupported.
 
 ```bash
 git clone <this-repo>
 cd auidionan
 npm ci
-cp .env.example .env.local     # works as-is: provider=mock, no credentials needed
+cp .env.example .env.local     # works as-is: provider=mock, no credentials
 npm run dev                    # http://localhost:3000
 ```
 
-Then click a corpus chip (e.g. **"Circular ficticia 1/2024"**), switch
-between **Literal / Listen / Manual Gold**, press play, and click segments to
-inspect source-vs-spoken text and provenance. Drop any native text PDF to
-test it against your own documents (parsed locally, max 25 MB).
-
-Real speech (Kokoro via NaN) is optional and opt-in — see
-[docs/providers.md](docs/providers.md):
-
-```bash
-# .env.local
-SPEECH_PROVIDER=nan
-NAN_BASE_URL=https://<endpoint>/v1
-NAN_API_KEY=<server-only; never reaches the browser>
-```
+Open the app, drop a document (or click an example), and press **Escuchar**.
+You can switch between **Escuchar** (Listen) and **Literal** (verbatim)
+reading, choose the language, and adjust the voice/engine in the advanced
+options. The **Laboratorio** page (`/lab`) exposes the lower-level
+experimentation surface and provenance inspection.
 
 ## Commands
 
-| Command                                       | What it does                                                          |
-| --------------------------------------------- | --------------------------------------------------------------------- |
-| `npm test`                                    | unit + golden + integration (mock provider, offline)                  |
-| `npm run lint` / `typecheck` / `format:check` | static checks                                                         |
-| `npm run build`                               | production build                                                      |
-| `npm run test:e2e`                            | Playwright critical-path tests (CI-safe, mock provider)               |
-| `npm run fixtures`                            | regenerate the synthetic corpus (PDFs + reference JSON + gold)        |
-| `npm run eval:extraction`                     | synthetic smoke test for extraction (does **not** close G2)           |
-| `npm run eval:spoken`                         | engine activity + Listen-vs-Gold engineering regression metric        |
-| `npm run eval:fidelity`                       | G4a: critical-literal preservation; **fails the build on violations** |
-| `npm run eval:tts:live`                       | G1: real provider measurement (requires credentials, refuses mock)    |
-| `npm run eval:tts:wiring`                     | offline wiring smoke for the G1 harness (never G1 evidence)           |
-| `npm run g3a:prepare`                         | build the G3a blind listening kit (audio needs real credentials)      |
-| `npm run g4b:packet`                          | build the G4b human semantic-fidelity review packet                   |
-| `npm run test:provider:live`                  | opt-in live NaN wiring check (local only)                             |
-
-## Phase 0 status
-
-Two different claims, never conflated: **the laboratory is built** and
-**the hypothesis is validated**. Only the first is true today. Canonical
-table in [docs/phase-0.md](docs/phase-0.md):
-
-```text
-PHASE_0_INFRASTRUCTURE        = PASS   builds/tests/gates runnable offline
-G1_TTS_LIVE                   = PASS   NaN live 15rpm: 12/12 ok, TTFA p95 1.63s, 0×429 (tts.json)
-G2_EXTRACTION_REAL            = OPEN   synthetic smoke only (tables 0/2, footnote 0/1)
-G3A_PRODUCT_HYPOTHESIS        = OPEN   blind protocol prepared, ears required
-G3B_AUTOMATION_PROXY          = PASS   word-level Dice 0.945 — 8-entry gold set, 2026-09-02
-G3B_HUMAN                     = OPEN   capture-ratio protocol prepared (Literal/Gold/Listen)
-G4A_CRITICAL_LITERAL_PRESERV. = PASS   0 violations, 0 silent losses (machine-verified)
-G4B_SEMANTIC_FIDELITY         = PASS   32/32 human verdicts post-fix — reviewed corpus ONLY
-PRODUCT_GO_NO_GO              = NOT_DECIDED
-```
-
-A green CI run proves the experiment machinery works. It is not evidence
-that documents are easier to understand when heard — that is what G3a/G3b
-humans exist to decide.
+| Command                                       | What it does                                                |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| `npm test`                                    | unit + golden + integration tests (mock provider, offline)  |
+| `npm run lint` / `typecheck` / `format:check` | static checks                                               |
+| `npm run build`                               | production build                                            |
+| `npm run test:e2e`                            | Playwright critical-path tests (CI-safe, mock provider)     |
+| `npm run setup:pdfjs`                         | regenerate `public/pdfjs/` (pdf.js worker + standard fonts) |
+| `npm run test:provider:live`                  | opt-in live NaN wiring check (local only)                   |
 
 ## Architecture (tour)
 
@@ -131,54 +97,50 @@ humans exist to decide.
 src/
   domain/           pure logic: documents, spoken rules + fidelity, speech
                     contract, provenance          (no framework, no I/O)
-  adapters/         document-parsers (pdf.js) · speech-providers (nan, mock, pacing)
+  adapters/         document-parsers (pdf.js) · speech-providers (nan, mock, edge, pacing)
   infrastructure/   audio cache keys, filesystem cache, structured logging
   server/           env validation, rate limiting, framework-agnostic handler
-  app/              Next.js routes (thin wrappers) + laboratory UI
+  app/              Next.js routes (thin wrappers) + reader/lab UI
+  lib/              ingestion guards, export, buffered player, position persistence
 tests/              unit · golden · integration · e2e · fixtures
-evaluation/         corpus docs, eval scripts, machine-readable results
-docs/               architecture, models, privacy, providers, ADRs
+docs/               architecture, privacy, providers, ADRs, third-party notices
 ```
 
 Deep dive: [docs/architecture.md](docs/architecture.md) ·
 [docs/document-model.md](docs/document-model.md) ·
-[docs/spoken-representation.md](docs/spoken-representation.md)
+[docs/privacy.md](docs/privacy.md)
 
 ## Limitations (honest list)
 
-- Browser extraction does not detect **tables** or **two-column** reading
-  order, and cannot read **scanned** PDFs (no text layer). Measured, not
-  hidden: `evaluation/results/extraction.json`.
-- The committed corpus is **synthetic**; "reference" extractions are
-  Docling-shaped idealizations, not live Docling runs. Instructions for
-  benchmarking real Docling on legally-held PDFs:
-  [evaluation/corpus/README.md](evaluation/corpus/README.md).
-- Listen covers the initial Spanish regulatory rule set; coverage gaps
-  surface as **fidelity fallbacks** (safe, but literal-sounding audio).
-- Rate limiting/cache state are in-memory + single-process: **do not deploy
-  publicly** as-is, and never assume a personal API key grants third-party
-  serving rights.
-- No Adapted mode, no accounts, no mobile. On purpose.
+- Browser extraction is text-layer based: scanned PDFs without a text layer
+  cannot be read, and some complex layouts (e.g. two-column, dense tables)
+  may not be reproduced perfectly. This is measured, not hidden.
+- The committed example corpus is **synthetic**; it is a stand-in for the
+  target document types, not live regulatory filings.
+- Rate limiting and cache state are **in-memory** + single-process: this is
+  **not** a public multi-tenant service. Do not deploy as-is.
+- Real TTS (NaN/Kokoro, Edge TTS) is provider-dependent. Generated audio is
+  governed by the provider's terms, not this license, and model weights are
+  **not** redistributed by this repository.
 - **Legal note:** this project reads documents aloud; it is not legal or
   financial advice, and no automated check certifies semantic faithfulness.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) (especially the golden-rule loop and
-the regression-fixture policy), then open an issue or PR.
-Security reports: [SECURITY.md](SECURITY.md). Community: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-History: [CHANGELOG.md](CHANGELOG.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md), then open an issue or PR.
+Security reports: [SECURITY.md](SECURITY.md). Community:
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). History: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Third-party runtime components (pdf.js, Next.js,
-React, JSZip, Mammoth, DOMPurify, markdown-it, `idb`, `zod`) and the vendored
-foliate-js EPUB parser are permissively licensed; the full inventory and
-vendoring provenance live in
-[docs/third-party-notices.md](docs/third-party-notices.md). Model weights and
-audio from real providers are governed by **their** terms, not this license.
-Generated
-TTS audio is **not** redistributed in this repository: the G3a experiment
-commits the blinded manifest with per-clip SHA-256 (stimulus identity) while
-the WAV binaries stay in the private experimental kit pending confirmation of
-redistribution rights from the TTS provider.
+Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md). Third-party
+runtime components (pdf.js, Next.js, React, JSZip, Mammoth, DOMPurify,
+markdown-it, `idb`, `zod`, mediabunny, `msedge-tts`) and the vendored
+foliate-js EPUB parser keep their own licenses; the full inventory, versions,
+and vendoring provenance live in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (also at
+[docs/third-party-notices.md](docs/third-party-notices.md)). Note that the
+MPL-2.0 mediabunny library and the GPL-2.0+font-exception Liberation fonts are
+**not** relicensed under Apache-2.0. Model weights and audio from real
+providers are governed by **their** terms, not this license. Generated TTS
+audio is **not** redistributed in this repository.
