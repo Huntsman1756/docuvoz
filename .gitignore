@@ -49,6 +49,15 @@ next-env.d.ts
 /playwright-report/
 /playwright/.cache/
 
+# desktop (Tauri) build artifacts
+/sidecar/dist/
+/desktop/.next/
+/desktop/out/
+/desktop/public/pdfjs/
+/src-tauri/target/
+/src-tauri/binaries/
+/src-tauri/gen/schemas/
+
 # pdf.js assets are copied from node_modules by `npm run setup:pdfjs`
 /public/pdfjs/
 

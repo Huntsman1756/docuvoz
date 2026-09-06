@@ -5,6 +5,12 @@ coverage/
 playwright-report/
 test-results/
 public/pdfjs/
+sidecar/dist/
+desktop/.next/
+desktop/out/
+desktop/public/pdfjs/
+src-tauri/target/
+src-tauri/gen/schemas/
 
 # Vendored third-party code and its provenance records are owned upstream and
 # must stay byte-identical — never reformatted by the project toolchain.

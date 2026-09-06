@@ -55,25 +55,35 @@ export class DesktopSpeechTransport implements SpeechTransport {
     const controller = new AbortController();
     this.pending.set(requestId, controller);
 
-    const onAbort = () => {
-      controller.abort();
-      // Best-effort: Rust cancels the sidecar request; a failure here must not
-      // surface to the caller (the abort is already the outcome).
-      void this.invoke("speech_cancel", { requestId }).catch(() => undefined);
-    };
-    signal?.addEventListener("abort", onAbort);
+    // Race the invoke against caller cancellation so an abort rejects promptly
+    // with an AbortError (mirroring the Web transport) while also telling Rust
+    // to cancel the sidecar request (no provider slot leak, no stale audio).
+    const abortPromise = new Promise<never>((_, reject) => {
+      const onAbort = () => {
+        controller.abort();
+        void this.invoke("speech_cancel", { requestId }).catch(() => undefined);
+        reject(new DOMException("The operation was aborted.", "AbortError"));
+      };
+      if (signal?.aborted) {
+        onAbort();
+        return;
+      }
+      signal?.addEventListener("abort", onAbort);
+    });
 
     try {
-      const frame = await this.invoke<ArrayBuffer>("speech", {
-        requestId,
-        text: request.text,
-        voice: request.voice,
-        engine: request.engine,
-        speed: request.speed,
-      });
+      const frame = await Promise.race([
+        this.invoke<ArrayBuffer>("speech", {
+          requestId,
+          text: request.text,
+          voice: request.voice,
+          engine: request.engine,
+          speed: request.speed,
+        }),
+        abortPromise,
+      ]);
       return parseFrame(frame);
     } finally {
-      signal?.removeEventListener("abort", onAbort);
       this.pending.delete(requestId);
     }
   }

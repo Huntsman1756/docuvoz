@@ -24,6 +24,12 @@ const eslintConfig = defineConfig([
     "evaluation/results/**",
     "playwright-report/**",
     "test-results/**",
+    // Desktop build artifacts and generated Rust/JSON:
+    "sidecar/dist/**",
+    "desktop/.next/**",
+    "desktop/out/**",
+    "src-tauri/target/**",
+    "src-tauri/gen/**",
   ]),
 ]);
 

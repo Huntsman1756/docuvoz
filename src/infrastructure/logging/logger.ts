@@ -41,8 +41,11 @@ function emit(level: LogLevel, fields: LogFields, message?: string): void {
     ...(message !== undefined ? { msg: message } : {}),
     ...fields,
   });
-  if (level === "error") process.stderr.write(`${line}\n`);
-  else process.stdout.write(`${line}\n`);
+  // The speech sidecar reserves stdout for its READY handshake; setting
+  // LOG_TO_STDERR=1 routes every log line to stderr instead.
+  const stream = process.env.LOG_TO_STDERR === "1" ? process.stderr : process.stdout;
+  if (level === "error") stream.write(`${line}\n`);
+  else stream.write(`${line}\n`);
 }
 
 export function createLogger(extra: LogFields = {}): Logger {

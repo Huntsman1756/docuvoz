@@ -64,12 +64,18 @@ export class WebSpeechTransport implements SpeechTransport {
     }
 
     const providerName = response.headers.get("x-provider") ?? undefined;
+    const durationHeader = response.headers.get("request-duration-ms");
+    const providerDurationMs =
+      durationHeader !== null && Number.isFinite(Number(durationHeader))
+        ? Number(durationHeader)
+        : undefined;
     const audio = await response.blob();
     return {
       audio,
       mimeType,
       cacheKey,
       cacheStatus,
+      providerDurationMs,
       boundaries,
       providerName,
     };
