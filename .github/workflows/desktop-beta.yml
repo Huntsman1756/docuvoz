@@ -70,6 +70,9 @@ jobs:
       - name: Build Tauri bundle (app + dmg, ad-hoc signed beta)
         run: npx tauri build
 
+      - name: Show macOS bundles
+        run: find src-tauri/target/release/bundle -maxdepth 3 -print
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
