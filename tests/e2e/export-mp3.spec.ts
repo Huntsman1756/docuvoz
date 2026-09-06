@@ -36,6 +36,37 @@ function trackSpeechRequests(page: Page): () => Map<string, number> {
   return () => counts;
 }
 
+/**
+ * A large Spanish document that reliably produces many speech chunks, used only
+ * by the cancellation test. A tiny fixture makes the MP3 export finish in well
+ * under a second, so the export dialog's cancel button (rendered only while
+ * `exporting` is true) is detached before Playwright can click it. This text
+ * guarantees a multi-second export, keeping the test deterministic (retries=0).
+ * Mirrors the same helper in tests/e2e/export-m4a.spec.ts.
+ */
+function largeSpanishText(): string {
+  const nonce = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const sentences = [
+    "La presente disposición establece el régimen de obligaciones informativas aplicable a todas las entidades sujetas a supervisión reforzada durante el ejercicio en curso y los inmediatamente siguientes.",
+    "El umbral máximo de exposición será de un millón doscientos treinta y cuatro mil quinientos sesenta y siete euros con ochenta y nueve céntimos, revisable anualmente conforme al índice general de precios al consumo.",
+    "Los importes que superen los quinientos mil euros deberán comunicarse a la autoridad competente en un plazo no superior a tres días hábiles contados desde la fecha del acuerdo correspondiente entre las partes.",
+    "El tipo de interés aplicable resultará de incrementar el índice de referencia a doce meses en veinticinco puntos básicos, sin perjuicio de las comisiones de apertura y de estudio previamente pactadas.",
+    "Se exceptúan de este régimen las entidades que no alcancen un ratio de solvencia consolidado del ocho coma cinco por ciento sobre los activos ponderados por riesgo al cierre del periodo.",
+    "La memoria anual deberá reflejar de forma clara y diferenciada la evolución patrimonial, los resultados obtenidos y las principales incidencias detectadas durante todo el ejercicio.",
+    "Cada unidad administrativa remitirá su informe trimestral antes del día quince del mes siguiente al cierre del trimestre, en el formato normalizado que se indica en el anexo correspondiente.",
+    "Las modificaciones sustanciales del plan de ajustes deberán someterse a la aprobación previa del consejo rector, que resolverá en un plazo máximo de quince días desde la recepción completa de la documentación.",
+    "El servicio de atención a la clientela garantizará la respuesta en un plazo máximo de dos días hábiles, registrando todas las incidencias en el sistema de gestión previsto a tal efecto.",
+    "A los efectos de este acuerdo tendrán la consideración de partes vinculadas aquellas entidades que compartan órgano de administración o una participación superior al diez por ciento del capital social.",
+  ];
+  const paras: string[] = [];
+  for (let i = 0; i < 40; i++) {
+    const a = sentences[i % sentences.length];
+    const b = sentences[(i + 3) % sentences.length];
+    paras.push(`${a} ${b} Referencia interna ${nonce}-${i}.`);
+  }
+  return `Circular informativa ${nonce}\n\n${paras.join("\n\n")}`;
+}
+
 /* ------------------------------------------------------------------ */
 /*  MP3 export                                                         */
 /* ------------------------------------------------------------------ */
@@ -101,21 +132,48 @@ test("export uses cached speech blobs — no new TTS synthesis", async ({ page }
 });
 
 test("cancellation does not affect Reader playback", async ({ page }) => {
-  await loadFixture(page, "Documento simple");
+  // Load a LARGE document so the MP3 export keeps running long enough that the
+  // export dialog's cancel button is reliably present and clickable (a tiny
+  // fixture finishes the export in well under a second and the button would be
+  // detached before Playwright could click it). The reader keeps the export
+  // dialog open for the whole export, so its "Cancelar" button (class
+  // `.export-dialog-cancel`) renders inside the export overlay. We target it by
+  // that unique class rather than by role/name so the export-bar ✕ and the
+  // transport download button (both labelled "cancelar descarga" while
+  // exporting) can't trip strict mode.
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "DocuVoz" })).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "cancelacion-grande.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(largeSpanishText(), "utf8"),
+  });
+  await expect(page.locator(".reader-doc-name")).toContainText("cancelacion-grande.txt", {
+    timeout: 30_000,
+  });
 
+  // Start playback first so we can prove cancellation leaves it untouched.
   const play = page.getByRole("button", { name: /Escuchar/ });
+  await expect(play).toBeVisible();
+  await expect(play).toBeEnabled();
   await play.click();
   await expect(page.getByRole("button", { name: /Pausar/ })).toBeVisible({
     timeout: 30_000,
   });
 
+  // Open the export dialog and select MP3.
   const downloadBtn = page.getByRole("button", { name: /audio/i });
   await expect(downloadBtn).toBeVisible();
   await downloadBtn.click();
   await page.getByRole("button", { name: "MP3" }).click();
-  await page.getByRole("button", { name: "Exportar audio" }).click();
-  await page.getByRole("button", { name: "Cancelar" }).click({ timeout: 10_000 });
 
+  // Start the export, then cancel it from the (still-open) export dialog.
+  await page.getByRole("button", { name: "Exportar audio" }).click();
+  const cancelBtn = page.locator(".export-dialog-cancel");
+  await expect(cancelBtn).toBeVisible({ timeout: 10_000 });
+  await cancelBtn.click();
+
+  // Playback must be unaffected: still playing.
   await expect(page.getByRole("button", { name: /Pausar/ })).toBeVisible();
   await expect(page.locator("main")).toHaveAttribute("data-phase", "playing");
 });
