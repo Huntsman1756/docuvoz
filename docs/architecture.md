@@ -1,22 +1,21 @@
 # Architecture
 
-AUIDIO NAN is a web-first **reading laboratory**, not a product. The pipeline
-under test:
+DocuVoz is a web-first, audio-first document reader. The pipeline:
 
 ```text
 PDF bytes
   ↓  (browser only — pdf.js)
 StructuredDocument            src/domain/documents/types.ts
   ↓  (pure, deterministic)    adapters/document-parsers/build-document.ts
-SpokenPlan (Literal | Listen | Manual Gold)
+SpokenPlan (Literal | Listen)
   ↓                            domain/spoken/pipeline.ts + rules/* + fidelity.ts
 SpeechChunk[] (≈400 chars)     domain/spoken/speech-plan.ts
   ↓  (HTTP, one chunk per call)
 /api/speech                    server/api/speech-handler.ts
   ↓
-SpeechProvider (mock | nan)    domain/speech/types.ts (interface)
+SpeechProvider (mock | nan | edge)    domain/speech/types.ts (interface)
   ↓
-audio bytes → IndexedDB / filesystem cache → <audio> playback + highlight
+audio bytes → IndexedDB / filesystem cache → buffered playback + highlight
 ```
 
 ## Layers and boundaries

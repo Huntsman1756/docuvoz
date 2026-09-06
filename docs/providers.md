@@ -38,17 +38,14 @@ Used by all tests, CI, and local development without credentials. It exercises
 the full stack (queue, cache, metrics) but says nothing about real latency —
 gates requiring real measurements must not use it.
 
-### `nan` — DEVELOPMENT / VALIDATION INFRASTRUCTURE
-
-> **NaN is validation infrastructure, not product infrastructure.**
+### `nan` — optional provider
 
 `src/adapters/speech-providers/nan-provider.ts` speaks the OpenAI-compatible
 `POST {base}/audio/speech` protocol (`model`, `input`, `voice`, `speed`,
-`response_format`) with a bearer key from the server environment. It is used
-in Phase 0 to answer: _does Kokoro-via-NaN audio quality and latency support
-the experiment?_
+`response_format`) with a bearer key from the server environment. It is an
+optional provider you can enable with `SPEECH_PROVIDER=nan`.
 
-**Before any use beyond personal validation, review:**
+**Before any use beyond personal use, review:**
 
 - the provider's **licensing and terms of service** for the model weights in
   use (Kokoro's own license) and for API usage;
@@ -64,9 +61,7 @@ the experiment?_
 tests with mocked fetch (request shape, 429/5xx mapping, no credential leaks)
 and an **opt-in live test** (`npm run test:provider:live` with
 `RUN_LIVE_PROVIDER=1`, `SPEECH_PROVIDER=nan`, valid `NAN_BASE_URL` +
-`NAN_API_KEY`). It has **not** been exercised against a live endpoint here
-because no credentials exist in this environment. G1 (latency) therefore
-remains open until run with real credentials via `npm run eval:tts:live`.
+`NAN_API_KEY`).
 
 ### Configuring NaN locally
 

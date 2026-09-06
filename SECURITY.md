@@ -2,12 +2,13 @@
 
 ## Supported versions
 
-| Version                   | Supported          |
-| ------------------------- | ------------------ |
-| 0.1.x (Phase 0 prototype) | :white_check_mark: |
+| Version | Supported          |
+| ------- | ------------------ |
+| 0.1.x   | :white_check_mark: |
 
-This is a research prototype. It is **not** a hardened production service and
-is currently intended to run locally or in trusted environments only.
+DocuVoz is an open-source, audio-first document reader. It runs locally (or on
+a host you control) and is **not** a hosted multi-tenant service. The security
+model below is designed for self-hosted and local use.
 
 ## Reporting a vulnerability
 
@@ -15,9 +16,8 @@ Please report suspected vulnerabilities **privately** through GitHub's
 ["Report a vulnerability"](../../security/advisories/new) form on this
 repository. Do not open a public issue for security problems.
 
-We aim to acknowledge reports within 5 business days. Because this is a
-single-maintainer prototype, response times may vary; reports will be handled
-in good faith and, where appropriate, credited.
+We aim to acknowledge reports within 5 business days. Response times may vary;
+reports will be handled in good faith and, where appropriate, credited.
 
 ## Design stance
 
@@ -49,11 +49,11 @@ The security model is deliberately narrow (see also [docs/privacy.md](docs/priva
 
 ## Notes and caveats
 
-- The prototype runs as a single Next.js process. Rate limiting and dedupe
+- DocuVoz runs as a single Next.js process. Rate limiting and dedupe
   state are **in-memory**; running multiple instances requires shared state.
 - The filesystem audio cache (`.cache/audio`) stores synthesized speech for
   requests the server has seen. Treat the server host accordingly and do not
-  deploy this prototype to multi-tenant infrastructure.
+  deploy to multi-tenant infrastructure.
 - `SPEECH_PROVIDER=nan` sends the (already normalized, already public-intended)
   chunk text to a third party. Do not use it with confidential documents
   without reviewing the provider's terms.

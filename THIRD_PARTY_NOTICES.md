@@ -1,6 +1,6 @@
 # Third-party notices
 
-DocuVoz (auidionan) ships, vendors, or references third-party components.
+DocuVoz ships, vendors, or references third-party components.
 The project's own code is licensed under the Apache License, Version 2.0
 ([LICENSE](LICENSE)). The components below keep their own licenses and are
 **not** relicensed under Apache-2.0.

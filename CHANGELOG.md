@@ -8,9 +8,41 @@ The **spoken-representation engine** has its own version
 (`SPOKEN_ENGINE_VERSION`) that is part of every audio cache key; engine rule
 changes are listed under the same headings.
 
-## [Unreleased]
+## [0.1.0] - 2026-09-06
 
-### Changed
+First public open-source release of DocuVoz, an audio-first document reader.
+
+### Added
+
+- **Audio-first document reader** — PDF, EPUB, DOCX, TXT, Markdown and HTML,
+  parsed locally in the browser.
+- **Literal and Listen modes** — Literal reads source text faithfully; Listen
+  deterministically makes written conventions easier to hear (dates,
+  percentages, EUR amounts, legal references, abbreviations, structured
+  tables/notes where available).
+- **Speech providers** — Edge TTS (Ximena Spanish routing), NaN/Kokoro, and a
+  deterministic local mock, behind a single provider abstraction.
+- **Buffered playback** — continuous, bounded-prefetch playback with
+  current-location following.
+- **Navigation** — section navigation, −15s / +30s seek, speed control.
+- **Resume and recents** — per-document position and recent-document list,
+  stored locally.
+- **Optional persistent reopen** — on Chromium, a granted file handle can
+  reopen the document directly, with a safe reselection fallback.
+- **Export** — WAV, MP3 and M4A (Mediabunny).
+- **Privacy** — no TTS network request until Play or Export.
+- **Accessibility / mobile** — responsive layout and reduced-motion support.
+- **Apache-2.0** licensed release.
+
+## Research baseline (pre-release)
+
+The following records the frozen research baseline that DocuVoz grew out of.
+It is preserved for provenance and is **not** part of the public product
+feature list.
+
+### [Unreleased]
+
+#### Changed
 
 - **Pre-publication sanitation (2026-09-02):** the 16 G3a WAV stimulus
   binaries were removed from the public Git history before the first push
@@ -28,7 +60,7 @@ changes are listed under the same headings.
   8-entry Manual Gold set (was 0.951 on the 5-entry set); engineering
   regression alarm only, unchanged meaning.
 
-### Changed (earlier)
+#### Changed (earlier)
 
 - **Engine `1.1.0`** (`SPOKEN_ENGINE_VERSION`, invalidates audio cache): the
   `legal-references` rule no longer destroys the sentence boundary after a
@@ -59,7 +91,7 @@ changes are listed under the same headings.
   it maps only to the transport sub-gates `G1_PROVIDER_CONNECTIVITY`,
   `G1_PROVIDER_LATENCY`, `G1_PROVIDER_RATE_BEHAVIOR`.
 
-### Added
+#### Added
 
 - `npm run eval:tts:wiring` — offline self-test of the measurement harness
   writing to `results/tts.wiring-smoke.json`, clearly excluded from G1.
@@ -72,11 +104,11 @@ changes are listed under the same headings.
   (`evaluation/experiments/g4b/`).
 - Unit tests for the G3a pairing/blinding logic (`tests/unit/g3a-lib.test.ts`).
 
-## [0.1.0] - 2026-09-02
+### [research-baseline] - 2026-09-02
 
-First Phase 0 laboratory release.
+First Phase 0 laboratory baseline.
 
-### Added
+#### Added
 
 - **Document pipeline**: browser-side PDF extraction (pdf.js) into a
   Docling-flavored structured block model with span-level provenance; corpus
@@ -99,10 +131,8 @@ First Phase 0 laboratory release.
   segment highlighting, provenance inspector, metrics panel.
 - **Evaluation harness**: extraction (G2), spoken coverage, fidelity (G4) and
   TTS latency (G1) scripts producing machine-readable results.
-- **Repository**: MIT license, CI (lint/typecheck/tests/build + npm audit),
-  security and contribution docs, ADRs.
 
-### Known limitations
+#### Known limitations
 
 - Tables, two-column and scanned layouts are not handled by browser
   extraction (measured, not hidden — see `evaluation/results/extraction.json`).

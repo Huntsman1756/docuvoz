@@ -1,5 +1,5 @@
-AUIDIO NAN
-Copyright (c) 2026 AUIDIO NAN contributors
+DocuVoz
+Copyright (c) 2026 DocuVoz contributors
 
 This product is licensed under the Apache License, Version 2.0
 (see the LICENSE file in this repository).

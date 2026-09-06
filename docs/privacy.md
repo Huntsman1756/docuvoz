@@ -122,13 +122,14 @@ never the original file.
 
 - Adapted (LLM) mode: when it exists it must obtain explicit opt-in, disclose
   that content leaves to a model provider, and preserve original/spoken
-  separation. It is out of Phase 0.
+  separation. It is not implemented.
 - Multi-user deployments require reworking rate limiting (per-tenant) and the
   server-side cache (isolation). Do not deploy this prototype publicly to
   third parties; see `docs/providers.md` for the provider-terms dimension.
 
 ## What this is not
 
-This prototype has no authentication, so "per client" rate limiting relies on
-`x-forwarded-for` and is trivially spoofable by design. It is a local
-laboratory, not a hosted service with privacy guarantees to third parties.
+This app has no authentication, so "per client" rate limiting relies on
+`x-forwarded-for` and is trivially spoofable by design. It is intended for
+local or self-hosted use, not as a hosted service with privacy guarantees to
+third parties.

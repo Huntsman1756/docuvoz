@@ -1,11 +1,10 @@
 # Contributing
 
-Thanks for your interest in improving AUIDIO NAN. This is a Phase 0 research
-prototype: the goal is to find out whether a deterministic spoken
-representation of difficult documents genuinely improves listening, while
-keeping **every spoken unit traceable to the source document**.
+Thanks for your interest in improving DocuVoz, an open-source audio-first
+document reader. The project keeps every spoken unit traceable to the source
+document and uses a deterministic, conservative Listen mode.
 
-Reading [docs/phase-0.md](docs/phase-0.md) and
+Reading [docs/architecture.md](docs/architecture.md) and
 [docs/spoken-representation.md](docs/spoken-representation.md) first is
 strongly recommended.
 
@@ -13,7 +12,7 @@ strongly recommended.
 
 - **English everywhere.** Code, comments, identifiers, commit messages,
   issues and PRs are written in English. (Spoken-rule _outputs_ are Spanish,
-  because Phase 0 targets Spanish regulatory documents.)
+  because the spoken engine targets Spanish documents.)
 - **Listen is deterministic and conservative.** No summarizing, paraphrasing,
   reordering or reinterpretation. When a transformation is uncertain, keep the
   original text. See [ADR-004](docs/decisions/ADR-004-deterministic-listen-mode.md).
@@ -26,9 +25,9 @@ strongly recommended.
 ## Development setup
 
 ```bash
-git clone <repo-url>
-cd auidionan
-npm ci                 # Node >= 20.9; npm is the only supported package manager
+git clone https://github.com/Huntsman1756/docuvoz.git
+cd docuvoz
+npm ci                 # Node ^24.15.0; npm is the only supported package manager
 cp .env.example .env.local   # works as-is with SPEECH_PROVIDER=mock
 npm run dev            # http://localhost:3000
 ```
@@ -83,6 +82,6 @@ that reproduces it to `tests/fixtures/golden/` (or a unit test).
 
 ## What not to send a PR for (yet)
 
-Phase 0 deliberately avoids accounts, billing, mobile apps, cloud libraries,
+DocuVoz deliberately avoids accounts, billing, mobile apps, cloud libraries,
 RAG/chat, and LLM "Adapted" mode. Discuss an idea in an issue before building
-anything outside the Phase 0 scope.
+anything outside the current scope.
