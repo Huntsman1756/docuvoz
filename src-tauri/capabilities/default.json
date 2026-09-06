@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "DocuVoz main window. Only Tauri core APIs are exposed to the WebView; no shell/process or filesystem access is granted.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

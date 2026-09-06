@@ -1,0 +1,29 @@
+[package]
+name = "docuvoz-desktop"
+version = "0.2.0-beta.1"
+description = "DocuVoz desktop (Tauri) — audio-first document reader"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+getrandom = "0.3"
+# Loopback HTTP only (sidecar on 127.0.0.1): no TLS features needed.
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+
+[target.'cfg(windows)'.dependencies]
+# Job object with kill-on-close: guarantees no orphan sidecar process even if
+# the desktop process dies hard.
+win32job = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
