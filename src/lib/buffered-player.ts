@@ -219,7 +219,7 @@ export class BufferedSpeechPlayer {
           supportsWordBoundaries: isEdge,
           supportsStreaming: isEdge,
           supportsExactDuration: true,
-          spanishQuality: isEdge,
+          preferredForSpanish: isEdge,
         },
       };
     } catch {
@@ -502,7 +502,7 @@ export class BufferedSpeechPlayer {
     this.engine.setPlaybackRate(this.playbackRate);
 
     // Pre-resolve provider metadata from the engine registry so capabilities
-    // (word boundaries, spanishQuality) are available before the first fetch.
+    // (word boundaries, preferredForSpanish) are available before the first fetch.
     const earlyMeta = await this.resolveProviderMeta();
     if (earlyMeta) this._providerMeta = earlyMeta;
 
@@ -679,7 +679,7 @@ export class BufferedSpeechPlayer {
           supportsWordBoundaries: isEdge,
           supportsStreaming: isEdge,
           supportsExactDuration: true,
-          spanishQuality: isEdge,
+          preferredForSpanish: isEdge,
         },
       };
     }

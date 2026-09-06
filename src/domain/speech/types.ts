@@ -47,8 +47,13 @@ export interface ProviderCapabilities {
   supportsStreaming: boolean;
   /** Whether this provider reports exact audio duration. */
   supportsExactDuration: boolean;
-  /** Whether this provider offers notably better Spanish prosody (Edge TTS). */
-  spanishQuality?: boolean;
+  /**
+   * Routing preference only: whether this provider is the preferred choice for
+   * Spanish text (Edge TTS neural voices). NOT a claim of objective universal
+   * quality; it only biases the "auto" engine selection toward this provider
+   * when the language is Spanish.
+   */
+  preferredForSpanish?: boolean;
 }
 
 export interface ProviderMetadata {

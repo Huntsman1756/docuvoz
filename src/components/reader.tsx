@@ -46,6 +46,7 @@ import {
   loadPosition,
   type SavedPosition,
 } from "@/lib/position-persistence";
+import { storeFileHandle } from "@/lib/file-handle-persistence";
 import { LandingPage } from "@/components/landing-page";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
@@ -99,7 +100,8 @@ export function Reader() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [showToc, setShowToc] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<"off" | "one" | "all">("off");
+  // Auto-scroll follow state: suspended when the user scrolls away manually.
+  const [followSuspended, setFollowSuspended] = useState(false);
   // Provider metadata from /api/health has resolved; only then do we build the
   // player so "auto" resolves once to its final engine/voice (no rebuild churn).
   const [providerReady, setProviderReady] = useState(false);
@@ -116,10 +118,6 @@ export function Reader() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSegRef = useRef<HTMLParagraphElement | null>(null);
   const positionRestoredRef = useRef(false);
-  // Refs keep the player stable across repeat-mode / chunk changes so toggling
-  // repeat (or advancing a chunk) no longer tears down in-flight playback.
-  const repeatModeRef = useRef<"off" | "one" | "all">("off");
-  const chunkIndexRef = useRef(0);
 
   /* ---- current time position (seconds) ---- */
   const [currentTime, setCurrentTime] = useState(0);
@@ -217,11 +215,6 @@ export function Reader() {
     [plan, chunks, doc],
   );
 
-  /* ---- keep repeat mode in a ref so the player stays stable ---- */
-  useEffect(() => {
-    repeatModeRef.current = repeatMode;
-  }, [repeatMode]);
-
   /* ---- player lifecycle ---- */
   useEffect(() => {
     playerRef.current?.destroy();
@@ -244,16 +237,8 @@ export function Reader() {
             pendingPlayRef.current = false;
             setQueuedPlay(false);
           }
-          if (s === "ended") {
-            if (repeatModeRef.current === "all") {
-              void player.play(0);
-            } else if (repeatModeRef.current === "one") {
-              void player.seekToChunk(chunkIndexRef.current, true);
-            }
-          }
         },
         onChunkChange: (i) => {
-          chunkIndexRef.current = i;
           setChunkIndex(i);
         },
         onMetrics: () => {},
@@ -294,30 +279,31 @@ export function Reader() {
     playerRef.current?.setPlaybackRate(rate);
   }, [rate]);
 
+  /* Resume target: when a saved position exists, queued/restored playback
+   * starts from the saved chunk, never from chunk 0. */
+  const resumeChunk = savedPosition ? (savedPosition.chunkIndex ?? 0) : 0;
+
   useEffect(() => {
     const player = playerRef.current;
     if (player && pendingPlayRef.current && prepared >= 1) {
       pendingPlayRef.current = false;
-      void player.play(0);
+      void player.play(resumeChunk);
     }
-  }, [prepared]);
+  }, [prepared, resumeChunk]);
 
   useEffect(() => {
     const player = playerRef.current;
-    if (
-      player &&
-      savedPosition &&
-      prepared >= 1 &&
-      !pendingPlayRef.current &&
-      !positionRestoredRef.current
-    ) {
+    if (player && savedPosition && providerReady && !positionRestoredRef.current) {
       const targetChunk = savedPosition.chunkIndex ?? 0;
       if (targetChunk < chunks.length) {
+        // Restore the position FIRST, then remain paused. The player fetches
+        // the target chunk (and its prefix) and seeks there without autoplay;
+        // the user must explicitly press Play to continue.
         positionRestoredRef.current = true;
         void player.seekToChunk(targetChunk, false);
       }
     }
-  }, [savedPosition, prepared, chunks.length]);
+  }, [savedPosition, chunks.length, providerReady]);
 
   /* ---- document loading ---- */
   const beginLoad = useCallback(() => {
@@ -341,13 +327,16 @@ export function Reader() {
   }, []);
 
   const analyzeFile = useCallback(
-    async (file: File, gen: number) => {
+    async (file: File, gen: number, handle?: FileSystemFileHandle) => {
       if (gen !== genRef.current) return;
       setRawPhase("loading");
       try {
         const fp = await computeContentFingerprint(file);
         if (gen !== genRef.current) return;
         setFingerprint(fp);
+        // Persist a browser file handle (Chromium) so the document can be
+        // reopened directly later; best-effort and never mandatory.
+        if (handle) void storeFileHandle(fp, handle);
 
         setRawPhase("extracting");
         const resolved = await resolveAdapter(file);
@@ -386,7 +375,7 @@ export function Reader() {
   );
 
   const onFile = useCallback(
-    async (file: File) => {
+    async (file: File, handle?: FileSystemFileHandle) => {
       const gen = beginLoad();
       setRawPhase("loading");
       const invalid = validateDocumentFile(file);
@@ -401,7 +390,7 @@ export function Reader() {
         );
         return;
       }
-      await analyzeFile(file, gen);
+      await analyzeFile(file, gen, handle);
     },
     [analyzeFile, beginLoad],
   );
@@ -468,6 +457,7 @@ export function Reader() {
       return;
     }
     if (st === "paused") {
+      setFollowSuspended(false);
       player.resume();
       return;
     }
@@ -475,16 +465,15 @@ export function Reader() {
       player.prepare();
       pendingPlayRef.current = true;
       setQueuedPlay(true);
+      setFollowSuspended(false);
       return;
     }
     if (st === "ended") {
-      if (repeatModeRef.current === "one") {
-        void player.seekToChunk(chunkIndexRef.current, true);
-      } else {
-        void player.play(0);
-      }
+      setFollowSuspended(false);
+      void player.play(0);
       return;
     }
+    setFollowSuspended(false);
     void player.play(undefined);
   }, [
     queuedPlay,
@@ -586,51 +575,71 @@ export function Reader() {
     [chunks, chunkIndex],
   );
 
-  /* ---- table / footnote segment markers ---- */
+  /* ---- table / footnote segment markers (structural metadata first) ---- */
   const segmentHasTable = useMemo(() => {
     const m = new Set<string>();
     plan?.segments.forEach((s) => {
-      if (
-        s.text.includes("Fila ") ||
-        s.text.includes("Fila.") ||
-        s.text.includes("Row ")
-      ) {
-        m.add(s.id);
-      }
+      const structural = s.provenance.blockIds.some(
+        (bid) => doc?.blocks.find((b) => b.id === bid)?.type === "table-cell",
+      );
+      // Fallback heuristic only for source formats that genuinely lack a
+      // table-cell semantic (e.g. EPUB currently flattens cells to paragraphs).
+      if (structural || /(^|\s)(Fila|Row)\s/.test(s.text)) m.add(s.id);
     });
     return m;
-  }, [plan]);
+  }, [plan, doc]);
 
   const segmentHasFootnote = useMemo(() => {
     const m = new Set<string>();
     plan?.segments.forEach((s) => {
-      if (/ Nota \d+:/.test(s.text)) {
-        m.add(s.id);
-      }
+      const structural = s.provenance.blockIds.some(
+        (bid) => doc?.blocks.find((b) => b.id === bid)?.type === "footnote",
+      );
+      if (structural || / Nota \d+:/.test(s.text)) m.add(s.id);
     });
     return m;
-  }, [plan]);
+  }, [plan, doc]);
 
-  // Auto-scroll with user-scroll detection
-  const lastUserScrollRef = useRef(0);
-  const SCROLL_SUSPENSION_MS = 3000;
+  // Auto-scroll: distinguish programmatic follow-scroll from a manual user
+  // scroll so the reader never suppresses its own follow behaviour.
+  const programmaticScrollUntilRef = useRef(0);
+  const prefersReducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    prefersReducedMotionRef.current = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
-      lastUserScrollRef.current = Date.now();
+      if (Date.now() < programmaticScrollUntilRef.current) return;
+      setFollowSuspended(true);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    if (playerState === "playing") {
-      const timeSinceLastScroll = Date.now() - lastUserScrollRef.current;
-      if (timeSinceLastScroll < SCROLL_SUSPENSION_MS) return;
+  const scrollActiveSegment = useCallback(() => {
+    const el = activeSegRef.current;
+    if (!el) return;
+    programmaticScrollUntilRef.current = Date.now() + 600;
+    el.scrollIntoView({
+      behavior: prefersReducedMotionRef.current ? "auto" : "smooth",
+      block: "center",
+    });
+  }, []);
 
-      activeSegRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  useEffect(() => {
+    if (playerState === "playing" && !followSuspended) {
+      scrollActiveSegment();
     }
-  }, [chunkIndex, playerState]);
+  }, [chunkIndex, playerState, followSuspended, scrollActiveSegment]);
+
+  const returnToCurrentText = useCallback(() => {
+    setFollowSuspended(false);
+    scrollActiveSegment();
+  }, [scrollActiveSegment]);
 
   /* ---- periodic position save during playback ---- */
   useEffect(() => {
@@ -755,45 +764,6 @@ export function Reader() {
             player?.seekForward(30);
           }
           break;
-        case "ArrowUp":
-          if (e.shiftKey) {
-            e.preventDefault();
-            setRate((prev) => {
-              const idx = RATES.indexOf(prev);
-              const next = Math.min(idx + 1, RATES.length - 1);
-              return RATES[next];
-            });
-          }
-          break;
-        case "ArrowDown":
-          if (e.shiftKey) {
-            e.preventDefault();
-            setRate((prev) => {
-              const idx = RATES.indexOf(prev);
-              const next = Math.max(idx - 1, 0);
-              return RATES[next];
-            });
-          }
-          break;
-        case "KeyR":
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            setRepeatMode((prev) => {
-              const next: Record<string, "off" | "one" | "all"> = {
-                off: "one",
-                one: "all",
-                all: "off",
-              };
-              return next[prev] ?? "off";
-            });
-          }
-          break;
-        case "KeyE":
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            openExportDialog();
-          }
-          break;
         default:
           break;
       }
@@ -801,7 +771,7 @@ export function Reader() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [playPause, openExportDialog]);
+  }, [playPause]);
 
   /* ---- label / state text ---- */
   const stateLabel = PHASE_LABELS[phase];
@@ -840,7 +810,6 @@ export function Reader() {
       className="reader"
       data-phase={phase}
       data-playing={isPlaying}
-      data-repeat={repeatMode}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -876,7 +845,7 @@ export function Reader() {
       {/* ——— Empty state ——— */}
       {phase === "empty" && (
         <LandingPage
-          onSelectFile={(file) => void onFile(file)}
+          onSelectFile={(file, handle) => void onFile(file, handle)}
           onLoadFixture={(path, title) => void loadFixture(path, title)}
           corpus={corpus}
           onFingerprint={(fp) => setFingerprint(fp)}
@@ -1102,6 +1071,15 @@ export function Reader() {
                 </span>
               )}
             </div>
+            {playerState === "playing" && followSuspended && (
+              <button
+                type="button"
+                className="reader-return"
+                onClick={returnToCurrentText}
+              >
+                Volver al texto actual
+              </button>
+            )}
             {plan.segments
               .filter((s) => !s.muted && s.text.trim().length > 0)
               .map((s) => {
@@ -1242,28 +1220,10 @@ export function Reader() {
           <span
             className="reader-transport-rate"
             aria-label="velocidad"
-            title="Velocidad (Shift+↑/↓)"
+            title="Velocidad"
           >
             {rate}×
           </span>
-          <button
-            type="button"
-            className={`reader-transport-repeat ${repeatMode !== "off" ? "active" : ""}`}
-            onClick={() =>
-              setRepeatMode((prev) => {
-                const next: Record<string, "off" | "one" | "all"> = {
-                  off: "one",
-                  one: "all",
-                  all: "off",
-                };
-                return next[prev] ?? "off";
-              })
-            }
-            aria-label={`Repetir: ${repeatMode === "off" ? "off" : repeatMode === "one" ? "uno" : "todo"}`}
-            title={`Repetir: ${repeatMode === "off" ? "off" : repeatMode === "one" ? "uno" : "todo"} (R)`}
-          >
-            {repeatMode === "one" ? "🔂" : "🔁"}
-          </button>
           {isBuffering && (
             <span
               className="reader-buffering"
@@ -1277,7 +1237,7 @@ export function Reader() {
             className="reader-download"
             aria-label={exporting ? "cancelar descarga" : "descargar audio"}
             onClick={openExportDialog}
-            title="Descargar audio (E)"
+            title="Descargar audio"
           >
             {exporting ? "Cancelando…" : "⬇ Audio"}
           </button>

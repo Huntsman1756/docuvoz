@@ -3,9 +3,9 @@
  *
  * Verifies that:
  *  - Engine registry exposes Edge capabilities via /api/health
- *  - BufferedSpeechPlayer exposes spanishQuality for Edge
+ *  - BufferedSpeechPlayer exposes preferredForSpanish for Edge
  *  - supportsWordBoundaries is true when Edge is the active engine
- *  - Default engine does not have spanishQuality
+ *  - Default engine does not have preferredForSpanish
  *  - Provider metadata flows from health descriptor to the player
  */
 import { describe, expect, it } from "vitest";
@@ -76,10 +76,10 @@ function makeHealthResponse() {
   };
 }
 
-/* ── Edge TTS: spanishQuality ───────────────────────────────────────────── */
+/* ── Edge TTS: preferredForSpanish ──────────────────────────────────────── */
 
-describe("Edge TTS: spanishQuality capability", () => {
-  it("player exposes spanishQuality when engine is Edge", async () => {
+describe("Edge TTS: preferredForSpanish capability", () => {
+  it("player exposes preferredForSpanish when engine is Edge", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
@@ -100,12 +100,12 @@ describe("Edge TTS: spanishQuality capability", () => {
 
     expect(player.providerMetadata).not.toBeNull();
     const meta = player.providerMetadata as NonNullable<typeof player.providerMetadata>;
-    expect(meta.capabilities.spanishQuality).toBe(true);
+    expect(meta.capabilities.preferredForSpanish).toBe(true);
 
     player.destroy();
   });
 
-  it("default engine does not have spanishQuality", async () => {
+  it("default engine does not have preferredForSpanish", async () => {
     const fetchMock = async (input: string | URL | Request) => {
       const url = input.toString();
       if (url === "/api/health") return makeHealthResponse();
@@ -134,8 +134,8 @@ describe("Edge TTS: spanishQuality capability", () => {
 
     const meta = player.providerMetadata;
     if (meta) {
-      // Default engine should NOT have spanishQuality flagged
-      expect(meta.capabilities.spanishQuality).not.toBe(true);
+      // Default engine should NOT have preferredForSpanish flagged
+      expect(meta.capabilities.preferredForSpanish).not.toBe(true);
     }
 
     player.destroy();

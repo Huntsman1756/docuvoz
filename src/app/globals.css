@@ -77,6 +77,17 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Accent-filled primary buttons share the same fill. */
+.reader-hero-btn,
+.reader-play,
+.reader-transport-play,
+.export-dialog-primary,
+.export-format.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* Focus styles for keyboard accessibility */
 button:focus-visible,
 select:focus-visible,
@@ -249,9 +260,6 @@ pre code {
 }
 
 .reader-hero-btn {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
   font-weight: 600;
   font-size: 15px;
   padding: 12px 28px;
@@ -476,19 +484,29 @@ pre code {
   line-height: 1.4;
 }
 
-.reader-change {
+.reader-change,
+.reader-download {
   font-size: 13px;
   color: var(--muted);
   transition:
     color 150ms,
     border-color 150ms;
   min-height: 36px;
+}
+
+.reader-change {
   padding: 6px 14px;
 }
 
-.reader-change:hover {
+.reader-change:hover,
+.reader-download:hover {
   color: var(--text);
   border-color: var(--muted);
+}
+
+.reader-download {
+  padding: 6px 12px;
+  white-space: nowrap;
 }
 
 /* ——— Document actions + TOC ——— */
@@ -617,29 +635,46 @@ pre code {
   animation: reader-fade-in 200ms ease;
 }
 
-.setting-main {
+.setting-main,
+.reader-settings-advanced label {
   display: flex;
   flex-direction: column;
   gap: 5px;
   font-size: 12px;
   color: var(--muted);
-  min-width: 130px;
   flex: 1;
 }
 
-.setting-main select {
+.setting-main {
+  min-width: 130px;
+}
+
+.reader-settings-advanced label {
+  min-width: 150px;
+}
+
+.setting-main select,
+.reader-settings-advanced select {
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 14px;
-  min-width: 130px;
   min-height: 40px;
   transition: border-color 150ms;
 }
 
-.setting-main select:focus {
+.setting-main select {
+  min-width: 130px;
+}
+
+.reader-settings-advanced select {
+  min-width: 150px;
+}
+
+.setting-main select:focus,
+.reader-settings-advanced select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(90, 156, 255, 0.2);
@@ -676,34 +711,6 @@ pre code {
   padding-top: 10px;
 }
 
-.reader-settings-advanced label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--muted);
-  min-width: 150px;
-  flex: 1;
-}
-
-.reader-settings-advanced select {
-  background: var(--panel-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  min-width: 150px;
-  min-height: 40px;
-  transition: border-color 150ms;
-}
-
-.reader-settings-advanced select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(90, 156, 255, 0.2);
-}
-
 /* ——— Primary play area ——— */
 
 .reader-primary {
@@ -717,9 +724,6 @@ pre code {
   font-weight: 600;
   padding: 16px 52px;
   border-radius: 999px;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
   transition:
     opacity 150ms,
     background 150ms,
@@ -833,6 +837,28 @@ pre code {
   animation: now-playing-pulse 1.4s ease-in-out infinite;
 }
 
+.reader-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--accent);
+  background: var(--panel-2);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition:
+    background 150ms,
+    border-color 150ms;
+  min-height: 34px;
+}
+
+.reader-return:hover {
+  background: rgba(90, 156, 255, 0.12);
+}
+
 @keyframes now-playing-pulse {
   0%,
   100% {
@@ -879,34 +905,36 @@ pre code {
   }
 }
 
-.reader-seg-table {
-  border-left: 3px solid var(--warn);
+.reader-seg-table,
+.reader-seg-footnote {
+  border-left: 3px solid;
   padding-left: 9px;
   position: relative;
+}
+
+.reader-seg-table {
+  border-left-color: var(--warn);
+}
+
+.reader-seg-footnote {
+  border-left-color: var(--ok);
+}
+
+.reader-seg-table::before,
+.reader-seg-footnote::before {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  font-size: 12px;
+  opacity: 0.6;
 }
 
 .reader-seg-table::before {
   content: "📊";
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  font-size: 12px;
-  opacity: 0.6;
-}
-
-.reader-seg-footnote {
-  border-left: 3px solid var(--ok);
-  padding-left: 9px;
-  position: relative;
 }
 
 .reader-seg-footnote::before {
   content: "📝";
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  font-size: 12px;
-  opacity: 0.6;
 }
 
 /* ——— Non-blocking export progress bar ——— */
@@ -1018,9 +1046,6 @@ pre code {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
   font-size: 20px;
   transition:
     opacity 150ms,
@@ -1121,14 +1146,18 @@ pre code {
   transition: background 150ms;
 }
 
-.reader-seek-bar::-webkit-slider-thumb {
-  appearance: none;
+.reader-seek-bar::-webkit-slider-thumb,
+.reader-seek-bar::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: var(--accent);
   border: 2px solid var(--bg);
   cursor: pointer;
+}
+
+.reader-seek-bar::-webkit-slider-thumb {
+  appearance: none;
   transition:
     transform 100ms,
     box-shadow 100ms;
@@ -1137,15 +1166,6 @@ pre code {
 .reader-seek-bar::-webkit-slider-thumb:hover {
   transform: scale(1.3);
   box-shadow: 0 0 0 4px rgba(90, 156, 255, 0.2);
-}
-
-.reader-seek-bar::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--bg);
-  cursor: pointer;
 }
 
 .reader-seek-bar:disabled {
@@ -1181,49 +1201,12 @@ pre code {
   background: var(--panel-2);
 }
 
-.reader-transport-repeat {
-  font-size: 16px;
-  padding: 8px 10px;
-  min-width: 44px;
-  min-height: 44px;
-  opacity: 0.6;
-  transition:
-    opacity 150ms,
-    border-color 150ms;
-}
-
-.reader-transport-repeat:hover {
-  opacity: 1;
-}
-
-.reader-transport-repeat.active {
-  opacity: 1;
-  border-color: var(--accent);
-  background: rgba(90, 156, 255, 0.1);
-}
-
 .reader-buffering {
   color: var(--warn);
   font-size: 12px;
   animation: reader-pulse 1.2s ease-in-out infinite;
   white-space: nowrap;
   padding: 4px 8px;
-}
-
-.reader-download {
-  font-size: 13px;
-  color: var(--muted);
-  transition:
-    color 150ms,
-    border-color 150ms;
-  min-height: 36px;
-  padding: 6px 12px;
-  white-space: nowrap;
-}
-
-.reader-download:hover {
-  color: var(--text);
-  border-color: var(--muted);
 }
 
 /* ——— Export dialog (modal overlay) ——— */
@@ -1310,9 +1293,7 @@ pre code {
 }
 
 .export-format.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  font-weight: 500;
 }
 
 .export-dialog-field {
@@ -1378,9 +1359,6 @@ pre code {
 }
 
 .export-dialog-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
   font-weight: 600;
   padding: 10px 24px;
   min-height: 40px;
@@ -1989,4 +1967,19 @@ pre code {
   font-size: 12px;
   border-top: 1px solid var(--border);
   padding-top: 12px;
+}
+
+/* ============================================================
+   Reduced motion
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
