@@ -29,17 +29,10 @@ text is included in the vendor directory as required.
 | `dompurify` (HTML sanitization)                                                                              | 3.4.14                   | MPL-2.0 or Apache-2.0                             |
 | `markdown-it` (Markdown parsing)                                                                             | 15.0.1                   | MIT                                               |
 | `mediabunny`, `@mediabunny/mp3-encoder`, `@mediabunny/aac-encoder` (audio export)                            | 1.55.6                   | MPL-2.0                                           |
-| `msedge-tts` (Edge neural voices, server-side)                                                               | 2.0.7                    | MIT                                               |
+| `msedge-tts` (Edge Read Aloud client, server-side)                                                           | 2.0.7                    | MIT                                               |
+| `fflate` (EPUB streaming decompression, runtime dependency)                                                  | 0.8.3                    | MIT                                               |
 | `idb` (IndexedDB wrapper for audio cache / position persistence)                                             | 8.0.3                    | ISC                                               |
 | `zod` (schema validation)                                                                                    | 4.5.4                    | MIT                                               |
-
-### Note on `fflate`
-
-`fflate` is declared in `devDependencies`. However, the EPUB adapter imports it
-at runtime (`src/adapters/document-parsers/adapters/epub-adapter.ts`), so it is
-included in the client bundle despite the `devDependencies` listing. This is a
-packaging inconsistency that should be resolved (move `fflate` to
-`dependencies`, or remove the runtime import) before the next release.
 
 ## Fonts and assets shipped under `public/`
 
