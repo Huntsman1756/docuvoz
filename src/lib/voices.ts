@@ -38,7 +38,8 @@ export const ENGINES: Record<EngineId, EngineInfo> = {
   edge: {
     id: "edge",
     label: "Edge TTS",
-    description: "Voces neuronales de Microsoft, gratis",
+    description:
+      "Servicio online de lectura en voz alta de Edge (no oficial, sin clave; disponibilidad no garantizada)",
   },
 };
 

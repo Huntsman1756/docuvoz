@@ -13,7 +13,7 @@ External transmission starts when the user initiates playback or export.
 | Mode                | Provider selected        | Text leaves browser?    | Destination                       | When                          | Play required?                      |
 | ------------------- | ------------------------ | ----------------------- | --------------------------------- | ----------------------------- | ----------------------------------- |
 | Auto (default)      | Server picks best engine | Yes — spoken chunk text | `/api/speech` → provider          | On synthesis (chunk-by-chunk) | Yes — first Play triggers synthesis |
-| Auto + Edge enabled | Edge TTS (free neural)   | Yes — spoken chunk text | `/api/speech` → Edge WebSocket    | On synthesis                  | Yes                                 |
+| Auto + Edge enabled | Edge TTS (unofficial online service) | Yes — spoken chunk text | `/api/speech` → Edge WebSocket | On synthesis | Yes |
 | Explicit Edge       | Edge TTS                 | Yes — spoken chunk text | `/api/speech` → Edge WebSocket    | On synthesis                  | Yes                                 |
 | Explicit NaN        | NaN/Kokoro               | Yes — spoken chunk text | `/api/speech` → NaN HTTP endpoint | On synthesis                  | Yes                                 |
 | Mock (CI/dev)       | Mock WAV                 | No external call        | `/api/speech` → in-memory mock    | On synthesis                  | Yes                                 |
@@ -51,8 +51,10 @@ is pressed, the user sees "Preparando audio..." while synthesis runs.
 
 ## External processing
 
-- **Edge TTS:** Free neural voices via Microsoft's unofficial WebSocket
-  endpoint. Text is sent as SSML (XML-escaped). No API key required.
+- **Edge TTS:** Optional, unofficial, best-effort integration with Microsoft
+  Edge's online Read Aloud service (WebSocket endpoint). No API key required.
+  Availability is not guaranteed and the service may change or stop working
+  without notice. Text is sent as SSML (XML-escaped).
   Word boundary metadata is received alongside audio.
 - **NaN/Kokoro:** OpenAI-compatible `/audio/speech` endpoint. Requires
   `NAN_BASE_URL` and `NAN_API_KEY`. Text is sent as JSON. Audio is

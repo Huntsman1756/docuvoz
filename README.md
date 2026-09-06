@@ -112,8 +112,15 @@ DocuVoz routes speech through a server-side provider abstraction. The browser
 only ever sees an opaque engine id.
 
 - **AUTO** — the server picks the best engine. For Spanish, Edge/Ximena is
-  currently preferred when available.
-- **EDGE TTS** — free Microsoft neural voices, no user API key required.
+  preferred when available. If Edge fails mid-synthesis and a standard engine
+  is configured, DocuVoz falls back to it once and shows a small notice; if no
+  fallback engine exists, an actionable error is shown. Mock is never silently
+  substituted in production.
+- **EDGE TTS** — optional, unofficial, best-effort integration with Microsoft
+  Edge's online Read Aloud service. No user API key is required. Availability
+  is not guaranteed and the service may change or stop working without notice.
+  This is not an official Microsoft integration, is not Azure Speech, and
+  carries no SLA.
 - **NAN** — an optional OpenAI-compatible provider (e.g. Kokoro). Requires
   `NAN_BASE_URL` and `NAN_API_KEY` in the server environment.
 
