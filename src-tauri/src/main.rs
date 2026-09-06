@@ -51,7 +51,7 @@ impl AppState {
     /// (crash recovery; deliberate no-supervisor simplicity).
     fn ensure_sidecar(&self) -> Result<(u16, String), String> {
         let mut guard = self.sidecar.lock().map_err(|_| "state_poisoned")?;
-        let dead = match guard.as_ref() {
+        let dead = match guard.as_mut() {
             None => true,
             Some(s) => matches!(s.child.try_wait(), Ok(Some(_))),
         };
@@ -129,15 +129,20 @@ fn spawn_sidecar(binary: &PathBuf, cache_dir: &PathBuf) -> Result<Sidecar, Strin
     let job = {
         use std::os::windows::io::AsRawHandle;
         match win32job::Job::create() {
-            Ok(job) => {
-                let _ = job.set_extended_limit_info();
-                // Kill-on-close: if the desktop process dies, the sidecar dies.
-                let _ = job.set_kill_on_job_close();
-                match job.assign_process(child.as_raw_handle() as _) {
-                    Ok(()) => Some(job),
-                    Err(_) => None,
+            Ok(job) => match job.query_extended_limit_info() {
+                Ok(mut info) => {
+                    // Kill-on-close: if the desktop process dies, the sidecar dies.
+                    info.limit_kill_on_job_close();
+                    match job.set_extended_limit_info(&info) {
+                        Ok(()) => match job.assign_process(child.as_raw_handle() as isize) {
+                            Ok(()) => Some(job),
+                            Err(_) => None,
+                        },
+                        Err(_) => None,
+                    }
                 }
-            }
+                Err(_) => None,
+            },
             Err(_) => None,
         }
     };
@@ -245,18 +250,25 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            let dir = exe.parent().ok_or("no exe dir")?;
             let ext = if cfg!(windows) { ".exe" } else { "" };
-            let sidecar_binary = exe
-                .parent()
-                .ok_or("no exe dir")?
-                .join(format!("docuvoz-speech-{}{ext}", env!("TAURI_TARGET")));
-            if !sidecar_binary.exists() {
-                return Err(format!(
-                    "sidecar binary missing: {}",
-                    sidecar_binary.display()
-                )
-                .into());
-            }
+            // Tauri places external binaries next to the app binary:
+            //   - dev builds keep the target-triple suffix;
+            //   - bundles install the plain name.
+            let candidates = [
+                dir.join(format!("docuvoz-speech-{}{ext}", env!("TAURI_TARGET"))),
+                dir.join(format!("docuvoz-speech{ext}")),
+            ];
+            let sidecar_binary = candidates
+                .iter()
+                .find(|p| p.exists())
+                .ok_or_else(|| {
+                    format!(
+                        "sidecar binary missing: {}",
+                        candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(" | ")
+                    )
+                })?
+                .clone();
             let cache_dir = app
                 .path()
                 .app_cache_dir()?
@@ -280,7 +292,7 @@ fn main() {
         .expect("tauri application failed to initialize")
         .run(|_app, event| {
             if let RunEvent::Exit = event {
-                kill_sidecar(_app.state::<AppState>());
+                kill_sidecar(&_app.state::<AppState>());
             }
         });
 }
