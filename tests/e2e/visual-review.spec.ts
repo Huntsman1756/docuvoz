@@ -2,7 +2,11 @@ import { test, expect, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { buildSampleEpub, buildDocx, SAMPLE_EPUB_MARKERS } from "./helpers/doc-fixtures";
 
-const SHOTS = join(process.cwd(), "docs", "screenshots");
+// Visual-review screenshots are test artifacts, not documentation. They write
+// to a gitignored output directory so a routine `npm run test:e2e` never dirties
+// the tracked docs/screenshots PNGs. To regenerate the intentional
+// documentation shots, copy the selected captures into docs/screenshots manually.
+const SHOTS = join(process.cwd(), "test-results", "screenshots");
 const VIEWPORTS = [
   { name: "desktop-1440x900", width: 1440, height: 900 },
   { name: "desktop-1920x1080", width: 1920, height: 1080 },

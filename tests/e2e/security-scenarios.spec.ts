@@ -169,7 +169,15 @@ test("binary file with .txt extension is handled gracefully", async ({ page }) =
 
   // Check that we're not in an unhandled-error state (the page is interactive)
   const phase = await page.locator("main").getAttribute("data-phase");
-  expect(["ready", "preparing", "loading", "reading", "error", null]).toContain(phase);
+  expect([
+    "ready",
+    "preparing",
+    "loading",
+    "reading",
+    "extracting",
+    "error",
+    null,
+  ]).toContain(phase);
 
   expect(errors).toEqual([]);
 });
