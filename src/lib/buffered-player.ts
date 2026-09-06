@@ -31,6 +31,8 @@ import { computeAudioCacheKey } from "@/infrastructure/cache/cache-key";
 import { getCachedAudio, putCachedAudio } from "./idb-audio-cache";
 import { BufferedAudioEngine } from "./buffered-audio-engine";
 import { isAbortError, type PlayerMetrics, type PlayerOptions } from "./speech-player";
+import type { SpeechTransport } from "./speech-transport";
+import { WebSpeechTransport } from "./web-speech-transport";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -146,6 +148,7 @@ export class BufferedSpeechPlayer {
   private playbackRate = 1;
   private readonly prefetchDepth: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly transport: SpeechTransport;
   private readonly voice: string | undefined;
   private readonly engineId: string | undefined;
   private readonly fetchTimeoutMs: number;
@@ -184,6 +187,7 @@ export class BufferedSpeechPlayer {
     this.playbackRate = options.playbackRate ?? 1;
     this.prefetchDepth = options.prefetchDepth ?? 2;
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
+    this.transport = options.transport ?? new WebSpeechTransport(this.fetchImpl);
     this.voice = options.voice;
     this.engineId = options.engine;
     this.healthLoader = options.health;
@@ -194,9 +198,7 @@ export class BufferedSpeechPlayer {
     const loader =
       this.healthLoader ??
       (async () => {
-        const res = await this.fetchImpl("/api/health");
-        if (!res.ok) throw new Error("health_unavailable");
-        return (await res.json()) as import("./speech-player").HealthDescriptor;
+        return await this.transport.health();
       });
     this.healthPromise ??= loader().catch(() => {
       this.healthPromise = null;
@@ -606,75 +608,56 @@ export class BufferedSpeechPlayer {
     }
 
     const started = Date.now();
-    const response = await this.fetchImpl("/api/speech", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: chunk.text,
-        ...(this.voice ? { voice: this.voice } : {}),
-        ...(this.engineId ? { engine: this.engineId } : {}),
-        speed: 1,
-      }),
-      signal: this.instanceAbort.signal,
-    });
-
-    if (!response.ok) {
-      let code = "speech_error";
-      try {
-        code = (await response.json()).error ?? code;
-      } catch {
-        /* */
+    let result: import("./speech-transport").SpeechSynthesisResult;
+    try {
+      result = await this.transport.synthesize(
+        {
+          text: chunk.text,
+          ...(this.voice ? { voice: this.voice } : {}),
+          ...(this.engineId ? { engine: this.engineId } : {}),
+          speed: 1,
+        },
+        this.instanceAbort.signal,
+      );
+    } catch (error) {
+      if (!isAbortError(error)) {
+        this.metrics.errors += 1;
+        this.emitMetrics();
       }
-      this.metrics.errors += 1;
-      this.emitMetrics();
-      throw new Error(code);
+      throw error;
     }
 
-    const serverKey = response.headers.get("cache-key") ?? key ?? `ephemeral-${chunk.id}`;
-    const cacheStatus = response.headers.get("cache-status");
-    if (cacheStatus === "HIT") this.metrics.serverCacheHits += 1;
-
-    const blob = await response.blob();
+    if (result.cacheStatus === "HIT") this.metrics.serverCacheHits += 1;
+    const blob = result.audio;
+    const serverKey = result.cacheKey || key || `ephemeral-${chunk.id}`;
     this.metrics.requests += 1;
     this.metrics.requestLatenciesMs.push(Date.now() - started);
     this.emitMetrics();
 
-    // Parse word boundaries from response header (base64-encoded JSON).
-    // This is a non-fatal operation — audio is the priority.
-    const boundariesHeader = response.headers.get("x-word-boundaries");
-    if (boundariesHeader) {
-      try {
-        const parsed = JSON.parse(atob(boundariesHeader)) as WordBoundary[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          this.chunkBoundaries.set(chunk.id, parsed);
-          // Propagate to engine if it exists
-          const chunkIndex = this.chunks.findIndex((c) => c.id === chunk.id);
-          if (chunkIndex >= 0 && this.engine) {
-            this.engine.setChunkBoundaries(chunkIndex, {
-              index: chunkIndex,
-              boundaries: parsed.map((b) => ({
-                word: b.text,
-                offsetMs: b.offsetSeconds * 1000,
-                durationMs: b.durationSeconds * 1000,
-              })),
-            });
-          }
-        }
-      } catch {
-        // Tolerate malformed boundaries — audio is unaffected
+    // Word boundaries (non-fatal — audio is the priority).
+    if (result.boundaries && result.boundaries.length > 0) {
+      this.chunkBoundaries.set(chunk.id, result.boundaries);
+      const chunkIndex = this.chunks.findIndex((c) => c.id === chunk.id);
+      if (chunkIndex >= 0 && this.engine) {
+        this.engine.setChunkBoundaries(chunkIndex, {
+          index: chunkIndex,
+          boundaries: result.boundaries.map((b) => ({
+            word: b.text,
+            offsetMs: b.offsetSeconds * 1000,
+            durationMs: b.durationSeconds * 1000,
+          })),
+        });
       }
     }
 
     // Cache on the server for future requests
     void putCachedAudio(serverKey, blob).catch(() => {});
 
-    // Update provider metadata from response headers if available.
-    // Capabilities are derived from the engineId or the provider name itself.
-    const providerName = response.headers.get("x-provider");
-    if (providerName) {
-      const isEdge = this.engineId === "edge" || providerName === "edge";
+    // Update provider metadata if available.
+    if (result.providerName) {
+      const isEdge = this.engineId === "edge" || result.providerName === "edge";
       this._providerMeta = {
-        name: providerName,
+        name: result.providerName,
         capabilities: {
           supportsWordBoundaries: isEdge,
           supportsStreaming: isEdge,

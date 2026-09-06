@@ -90,6 +90,9 @@ export interface PlayerOptions {
   health?: () => Promise<HealthDescriptor>;
   /** Timeout for individual fetch requests (ms). */
   fetchTimeoutMs?: number;
+  /** Speech transport seam. When omitted, a Web transport is used, so existing
+   * callers (and their `fetchImpl`) keep working unchanged. */
+  transport?: import("./speech-transport").SpeechTransport;
 }
 
 export class SpeechPlayer {

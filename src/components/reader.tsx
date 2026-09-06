@@ -47,6 +47,7 @@ import {
   type SavedPosition,
 } from "@/lib/position-persistence";
 import { storeFileHandle } from "@/lib/file-handle-persistence";
+import { createSpeechTransport } from "@/lib/speech-transport";
 import { LandingPage } from "@/components/landing-page";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2];
@@ -268,7 +269,12 @@ export function Reader() {
           if (ready > 0) setErrorText(null);
         },
       },
-      { voice: activeVoice, engine: engineId, playbackRate: rateRef.current },
+      {
+        voice: activeVoice,
+        engine: engineId,
+        playbackRate: rateRef.current,
+        transport: createSpeechTransport(),
+      },
     );
     playerRef.current = player;
     return () => player.destroy();
