@@ -20,6 +20,11 @@ const LIVE = !!process.env.E2E_LIVE;
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  // Bound concurrent browser contexts. On Windows, 8 workers opening loopback
+  // connections in bursts exhausted Chromium's per-socket buffer allocation
+  // (net::ERR_NO_BUFFER_SPACE on page.goto) — a system resource limit, not a
+  // product race. 4 keeps the suite deterministic on dev machines and CI.
+  workers: 4,
   // Real document playback + MP3/M4A export legitimately wait up to ~60 s
   // (chunk buffering, WASM encode); give each test enough budget so those
   // per-action waits are actually usable rather than being cut off by the
