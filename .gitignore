@@ -74,3 +74,13 @@ evaluation/experiments/*/private/
 # Stimulus identity is pinned by the SHA-256 values in
 # evaluation/experiments/g3a/manifest.json; binaries live in the private kit.
 
+# Orca kit: generated entries
+
+.orca-local/
+
+.orca-tools/
+
+.opencode/node_modules/
+
+.tickets/
+
