@@ -34,6 +34,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/docuvoz-speech"]
+    "externalBin": ["binaries/docuvoz-speech"],
+    "resources": {
+      "../../LICENSE": "licenses/LICENSE",
+      "../../NOTICE.md": "licenses/NOTICE.md",
+      "../../THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md"
+    }
   }
 }

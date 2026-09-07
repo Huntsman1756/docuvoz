@@ -62,8 +62,8 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: OS, browser, Node version, provider (mock/nan).
-      placeholder: Windows 11 / Chrome 130 / Node 22 / SPEECH_PROVIDER=mock
+      description: OS, browser or desktop app version, Node version, provider (mock/nan/edge).
+      placeholder: Windows 11 / Chrome 130 / Node 24.15 / SPEECH_PROVIDER=mock
   - type: checkboxes
     id: terms
     attributes:

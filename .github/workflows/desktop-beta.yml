@@ -6,22 +6,26 @@ name: desktop-beta
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   windows-x64:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Setup Rust (host target)
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
       - name: npm ci
-        run: npm ci
+        run: npm ci --engine-strict
 
       - name: Build static desktop frontend
         run: npm run build:desktop
@@ -35,8 +39,14 @@ jobs:
       - name: Build Tauri bundle (NSIS installer)
         run: npx tauri build
 
+      - name: Verify bundled license notices
+        run: |
+          $hits = Get-ChildItem -Recurse -Include LICENSE,NOTICE.md,THIRD_PARTY_NOTICES.md -Path src-tauri/target/release -ErrorAction SilentlyContinue
+          if (-not $hits -or ($hits | Group-Object Name).Count -lt 3) { Write-Error "License notices missing from bundle resources"; exit 1 }
+          $hits | ForEach-Object { $_.FullName }
+
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: docuvoz-windows-x64-beta
           path: src-tauri/target/release/bundle/nsis/*.exe
@@ -44,19 +54,20 @@ jobs:
 
   macos-arm64:
     runs-on: macos-14
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Setup Rust (host target)
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
       - name: npm ci
-        run: npm ci
+        run: npm ci --engine-strict
 
       - name: Build static desktop frontend
         run: npm run build:desktop
@@ -73,8 +84,17 @@ jobs:
       - name: Show macOS bundles
         run: find src-tauri/target/release/bundle -maxdepth 3 -print
 
+      - name: Verify bundled license notices
+        run: |
+          base="src-tauri/target/release/bundle/macos"
+          for f in LICENSE NOTICE.md THIRD_PARTY_NOTICES.md; do
+            hit="$(find "$base" -name "$f" -print -quit)"
+            if [ -z "$hit" ]; then echo "License notice missing from .app bundle: $f"; exit 1; fi
+            echo "$hit"
+          done
+
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: docuvoz-macos-arm64-beta
           path: |
