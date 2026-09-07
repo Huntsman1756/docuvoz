@@ -2,6 +2,8 @@
   "$schema": "https://opencode.ai/config.json",
 
   // DocuVoz (auidionan) - OpenCode + Orca orchestration kit.
+  // Note: the optional inferx provider requires INFERX_API_KEY and INFERX_TENANT
+  // in the local environment (never committed).
   // Single source of truth: agents from the kit merged with the repo's
   // NaN/InferX provider definitions. Do not re-create a parallel opencode.json.
 
@@ -121,7 +123,7 @@
       },
       "models": {
         "glm5.3-flash": {
-          "name": "GLM 5.3 Flash (NaN) - Main · multimodal · reasoning · 1M ctx",
+          "name": "GLM 5.3 Flash (NaN) - Main Â· multimodal Â· reasoning Â· 1M ctx",
           "reasoning": true,
           "tool_call": true,
           "limit": {
@@ -134,7 +136,7 @@
           },
         },
         "qwen3.6": {
-          "name": "Qwen 3.6 (NaN) - Kit executor · 262K ctx · vision",
+          "name": "Qwen 3.6 (NaN) - Kit executor Â· 262K ctx Â· vision",
           "reasoning": true,
           "tool_call": true,
           "limit": {
@@ -147,7 +149,7 @@
           },
         },
         "qwen3.8-flash": {
-          "name": "Qwen 3.8 Flash (NaN) - Executor · 262K ctx · vision",
+          "name": "Qwen 3.8 Flash (NaN) - Executor Â· 262K ctx Â· vision",
           "reasoning": true,
           "tool_call": true,
           "limit": {
@@ -160,7 +162,7 @@
           },
         },
         "deepseek-v4-flash": {
-          "name": "DeepSeek V4 Flash (NaN) - Fallback #1 · vision-exp · 1M ctx",
+          "name": "DeepSeek V4 Flash (NaN) - Fallback #1 Â· vision-exp Â· 1M ctx",
           "reasoning": true,
           "tool_call": true,
           "limit": {
@@ -173,7 +175,7 @@
           },
         },
         "mimo-v2.5": {
-          "name": "Xiaomi MiMo V2.5 (NaN) - Fallback #2 · omnimodal · 1M ctx",
+          "name": "Xiaomi MiMo V2.5 (NaN) - Fallback #2 Â· omnimodal Â· 1M ctx",
           "reasoning": true,
           "tool_call": true,
           "limit": {
@@ -186,7 +188,7 @@
           },
         },
         "gemma4": {
-          "name": "Gemma 4 (NaN) - Review / small_model · community · temp 0.6/top_p 0.95",
+          "name": "Gemma 4 (NaN) - Review / small_model Â· community Â· temp 0.6/top_p 0.95",
           "reasoning": true,
           "tool_call": false,
           "limit": {
@@ -209,12 +211,12 @@
         "timeout": 600000,
         "chunkTimeout": 120000,
         "headers": {
-          "X-Tenant": "quickstart-inference-tn-13dymq02pr",
+          "X-Tenant": "{env:INFERX_TENANT}",
         },
       },
       "models": {
         "qwen38-flash-next": {
-          "name": "Qwen 3.8 Flash Next (InferX) · 262K ctx",
+          "name": "Qwen 3.8 Flash Next (InferX) Â· 262K ctx",
           "reasoning": true,
           "tool_call": true,
           "limit": {
