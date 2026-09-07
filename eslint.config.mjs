@@ -33,6 +33,11 @@ const eslintConfig = defineConfig([
     "desktop/tsconfig.tsbuildinfo*",
     "src-tauri/target/**",
     "src-tauri/gen/**",
+    // OpenCode + Orca kit (vendored / generated, never repo source):
+    ".orca-local/**",
+    ".orca-tools/**",
+    ".opencode/**",
+    ".tickets/**",
   ]),
 ]);
 

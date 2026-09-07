@@ -31,7 +31,6 @@ import {
   updateRecentPosition,
   clearRecentPath,
   setRecentPath,
-  type RecentDocument,
 } from "@/lib/recent-documents";
 import type { StructuredDocument } from "@/domain/documents/types";
 

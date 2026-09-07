@@ -26,14 +26,14 @@
         "bash": "allow",
         "task": {
           "*": "deny",
-          "executor": "allow"
+          "executor": "allow",
         },
         "glob": "allow",
         "grep": "allow",
         "webfetch": "allow",
         "lsp": "allow",
-        "skill": "allow"
-      }
+        "skill": "allow",
+      },
     },
     "executor": {
       "mode": "subagent",
@@ -49,15 +49,15 @@
         "grep": "allow",
         "webfetch": "deny",
         "lsp": "allow",
-        "skill": "deny"
-      }
+        "skill": "deny",
+      },
     },
 
     // Kit: disable default OpenCode agents.
-    "build":    { "mode": "primary", "disable": true },
-    "plan":     { "mode": "primary", "disable": true },
-    "general":  { "mode": "subagent", "disable": true },
-    "explore":  { "mode": "subagent", "disable": true },
+    "build": { "mode": "primary", "disable": true },
+    "plan": { "mode": "primary", "disable": true },
+    "general": { "mode": "subagent", "disable": true },
+    "explore": { "mode": "subagent", "disable": true },
 
     // --- Repo legacy subagents (preserved) ---------------------------------
 
@@ -70,8 +70,8 @@
       "permission": {
         "edit": "ask",
         "bash": "ask",
-        "task": "deny"
-      }
+        "task": "deny",
+      },
     },
     "nan-bulletin-reviewer": {
       "mode": "subagent",
@@ -83,8 +83,8 @@
       "permission": {
         "edit": "deny",
         "bash": "deny",
-        "task": "deny"
-      }
+        "task": "deny",
+      },
     },
     "fallback-code-1": {
       "mode": "subagent",
@@ -94,8 +94,8 @@
       "permission": {
         "edit": "deny",
         "bash": "deny",
-        "task": "deny"
-      }
+        "task": "deny",
+      },
     },
     "fallback-code-2": {
       "mode": "subagent",
@@ -105,9 +105,9 @@
       "permission": {
         "edit": "deny",
         "bash": "deny",
-        "task": "deny"
-      }
-    }
+        "task": "deny",
+      },
+    },
   },
 
   "provider": {
@@ -117,7 +117,7 @@
       "options": {
         "baseURL": "https://api.nan.builders/v1",
         "timeout": 600000,
-        "chunkTimeout": 120000
+        "chunkTimeout": 120000,
       },
       "models": {
         "glm5.3-flash": {
@@ -126,12 +126,12 @@
           "tool_call": true,
           "limit": {
             "context": 1048576,
-            "output": 32768
+            "output": 32768,
           },
           "modalities": {
             "input": ["text", "image"],
-            "output": ["text"]
-          }
+            "output": ["text"],
+          },
         },
         "qwen3.6": {
           "name": "Qwen 3.6 (NaN) - Kit executor · 262K ctx · vision",
@@ -139,12 +139,12 @@
           "tool_call": true,
           "limit": {
             "context": 262144,
-            "output": 32768
+            "output": 32768,
           },
           "modalities": {
             "input": ["text", "image"],
-            "output": ["text"]
-          }
+            "output": ["text"],
+          },
         },
         "qwen3.8-flash": {
           "name": "Qwen 3.8 Flash (NaN) - Executor · 262K ctx · vision",
@@ -152,12 +152,12 @@
           "tool_call": true,
           "limit": {
             "context": 262144,
-            "output": 32768
+            "output": 32768,
           },
           "modalities": {
             "input": ["text", "image"],
-            "output": ["text"]
-          }
+            "output": ["text"],
+          },
         },
         "deepseek-v4-flash": {
           "name": "DeepSeek V4 Flash (NaN) - Fallback #1 · vision-exp · 1M ctx",
@@ -165,12 +165,12 @@
           "tool_call": true,
           "limit": {
             "context": 1048576,
-            "output": 32768
+            "output": 32768,
           },
           "modalities": {
             "input": ["text", "image"],
-            "output": ["text"]
-          }
+            "output": ["text"],
+          },
         },
         "mimo-v2.5": {
           "name": "Xiaomi MiMo V2.5 (NaN) - Fallback #2 · omnimodal · 1M ctx",
@@ -178,12 +178,12 @@
           "tool_call": true,
           "limit": {
             "context": 1048576,
-            "output": 32768
+            "output": 32768,
           },
           "modalities": {
             "input": ["text", "image", "audio"],
-            "output": ["text"]
-          }
+            "output": ["text"],
+          },
         },
         "gemma4": {
           "name": "Gemma 4 (NaN) - Review / small_model · community · temp 0.6/top_p 0.95",
@@ -191,14 +191,14 @@
           "tool_call": false,
           "limit": {
             "context": 262144,
-            "output": 16384
+            "output": 16384,
           },
           "modalities": {
             "input": ["text", "image"],
-            "output": ["text"]
-          }
-        }
-      }
+            "output": ["text"],
+          },
+        },
+      },
     },
     "inferx": {
       "npm": "@ai-sdk/openai-compatible",
@@ -209,8 +209,8 @@
         "timeout": 600000,
         "chunkTimeout": 120000,
         "headers": {
-          "X-Tenant": "quickstart-inference-tn-13dymq02pr"
-        }
+          "X-Tenant": "quickstart-inference-tn-13dymq02pr",
+        },
       },
       "models": {
         "qwen38-flash-next": {
@@ -219,21 +219,21 @@
           "tool_call": true,
           "limit": {
             "context": 262144,
-            "output": 32768
+            "output": 32768,
           },
           "modalities": {
             "input": ["text"],
-            "output": ["text"]
-          }
-        }
-      }
-    }
+            "output": ["text"],
+          },
+        },
+      },
+    },
   },
 
   "compaction": {
     "auto": true,
     "prune": true,
-    "reserved": 50000
+    "reserved": 50000,
   },
 
   "watcher": {
@@ -255,7 +255,7 @@
       "src-tauri/target/**",
       ".next/**",
       "test-results/**",
-      "playwright-report/**"
-    ]
-  }
+      "playwright-report/**",
+    ],
+  },
 }

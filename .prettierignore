@@ -21,3 +21,9 @@ src-tauri/gen/schemas/
 public/corpus/reference/
 public/corpus/gold/
 evaluation/results/
+
+# Kit/vendored non-source (never format these directories):
+.orca-local/
+.orca-tools/
+.opencode/
+.tickets/
