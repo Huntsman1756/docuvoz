@@ -8,14 +8,26 @@ This block is written and re-added by `next dev` â€” verify at `node_module
 
 <!-- END:nextjs-agent-rules -->
 
-# Agent orchestration (OpenCode + Orca)
+# Agent & contributor guide
 
-This repository always uses a two-agent workflow. It applies to every agent session in this repo:
+## Project
 
-- `orchestrator` (GLM 5.3 Flash) is the primary agent. It owns planning, decomposition, acceptance criteria, verification and gate decisions. It never edits implementation files.
-- Implementation is delegated ONLY to the `executor` subagent (Qwen 3.6) via a bounded work contract containing: objective, context, inputs, allowed_files, forbidden_files, constraints, tests, success_criteria, deliverables.
-- The orchestrator never trusts an executor summary as evidence: it inspects the actual diff and the actual test/check output before accepting.
-- Ticket-driven work runs through Orca: `.\scripts\orca-local.ps1` (always use the launcher; it wires `.orca-tools\bin` into PATH). Ticket tags: `needs-plan`, `ready-for-work`, `ready-for-review`, `blocked`, `needs-human-decision`, `verified`.
-- Never bypass the orchestrator/executor split. Do not create parallel agent configs; `opencode.jsonc` is the single source of truth (merging the kit agents with the repo NaN/InferX providers).
+DocuVoz is an open-source audio-first document reader (Next.js web + Tauri desktop with a Node speech sidecar). Node ^24.15.0, npm, TypeScript.
 
-Kit provenance: configuration scaffold adapted from a private internal orchestration kit (OpenCode + Orca two-agent workflow).
+## Structure
+
+`src/` (web app), `desktop/` (desktop entry routes), `sidecar/` (Node 24 sidecar: esbuild bundle + pkg packaging), `src-tauri/` (Tauri shell; common bundle config in tauri.conf.json, platform targets only in tauri.windows.conf.json and tauri.macos.conf.json), `scripts/` (build/verify tooling), `evaluation/` (eval harness), `docs/` (architecture, privacy, providers, ADRs).
+
+## Verification
+
+`npm run typecheck`; `npm run lint`; `npm run format:check`; `npm run test` (pretest builds the sidecar); `npm run test:e2e`; `npm run build`.
+
+## Conventions
+
+- Small coherent changes.
+- CI must stay green (no skipping/weakening checks).
+- Update `docs/` when behavior changes.
+- Never commit credentials (`.env*` ignored, `.env.example` is the template).
+- Do not modify the frozen research baseline (`docs/phase-0.md`, `evaluation/` historical artifacts, `docs/decisions/`) without an ADR.
+- Do not alter the sidecar architecture or the platform bundle-target convention without a documented decision.
+- Prefer reuse over new dependencies and record provenance in `THIRD_PARTY_NOTICES.md`.
