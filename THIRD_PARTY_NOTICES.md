@@ -11,9 +11,9 @@ the required notice **at the vendored location** (see
 
 ## Vendored source (copied into this repository)
 
-| Component                          | Location                                           | License                  | Upstream                                     | Provenance record                                                                                                                                               |
-| ---------------------------------- | -------------------------------------------------- | ------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| foliate-js `epub.js`, `epubcfi.js` | `src/adapters/document-parsers/vendor/foliate-js/` | MIT © 2022 John Factotum | <https://github.com/johnfactotum/foliate-js> | [vendor README](../src/adapters/document-parsers/vendor/foliate-js/README.md) (exact commits, hashes, update procedure); license text shipped next to the files |
+| Component                          | Location                                           | License                  | Upstream                                     | Provenance record                                                                                                                                            |
+| ---------------------------------- | -------------------------------------------------- | ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| foliate-js `epub.js`, `epubcfi.js` | `src/adapters/document-parsers/vendor/foliate-js/` | MIT © 2022 John Factotum | <https://github.com/johnfactotum/foliate-js> | [vendor README](src/adapters/document-parsers/vendor/foliate-js/README.md) (exact commits, hashes, update procedure); license text shipped next to the files |
 
 Vendored files are unmodified apart from Prettier reformatting; the MIT license
 text is included in the vendor directory as required.
@@ -48,14 +48,6 @@ components that are **not** Apache-2.0:
   `public/pdfjs/standard_fonts/LICENSE_LIBERATION`). These are a
   separately-licensed GPLv2+font-exception component and are **not** covered
   by the Apache-2.0 license of this project.
-
-## Trademarks and stock assets
-
-- `public/next.svg`, `public/vercel.svg` (and the related stock assets in
-  `public/`) are the stock Next.js template assets. "Next.js" is a trademark of
-  Vercel, Inc. and "Vercel" is a trademark of Vercel, Inc. These marks are used
-  for identification only; they do not imply endorsement and are not licensed
-  under Apache-2.0.
 
 ## License compatibility note
 

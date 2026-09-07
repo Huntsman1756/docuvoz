@@ -16,7 +16,7 @@ The domain and the API layer depend only on this interface. Provider-specific
 types never leak outward. The pipeline:
 
 ```text
-/api/speech route ─► PacedProvider ─► concrete provider (mock | nan | future)
+/api/speech route ─► PacedProvider ─► concrete provider (mock | nan | edge)
 ```
 
 `PacedProvider` (`src/adapters/speech-providers/pacing.ts`) owns cross-cutting
@@ -38,6 +38,20 @@ Used by all tests, CI, and local development without credentials. It exercises
 the full stack (queue, cache, metrics) but says nothing about real latency —
 gates requiring real measurements must not use it.
 
+### `edge` — optional unofficial provider
+
+Server-side integration (`msedge-tts`) with Microsoft Edge's online Read
+Aloud service. No API key is required. Enabled with `EDGE_TTS_ENABLED=1` and
+configured with `EDGE_TTS_VOICE`. Availability is not guaranteed and the
+service may change or stop working without notice. This is not an official
+Microsoft integration and is not Azure Speech; no SLA is implied.
+
+When enabled, it appears as the "Premium" engine in the reader's voice
+picker (engine labels in the UI are deliberately provider-agnostic). In
+AUTO routing it is preferred for Spanish when available; if it fails
+mid-synthesis and a standard engine is configured, DocuVoz falls back once
+and surfaces a small notice.
+
 ### `nan` — optional provider
 
 `src/adapters/speech-providers/nan-provider.ts` speaks the OpenAI-compatible
@@ -57,11 +71,7 @@ optional provider you can enable with `SPEECH_PROVIDER=nan`.
 - **availability expectations**: no SLA is implied; failures must remain
   visible (stable error codes) and never silently degrade into mock audio.
 
-**Not yet done in this environment:** the NaN adapter is covered by unit
-tests with mocked fetch (request shape, 429/5xx mapping, no credential leaks)
-and an **opt-in live test** (`npm run test:provider:live` with
-`RUN_LIVE_PROVIDER=1`, `SPEECH_PROVIDER=nan`, valid `NAN_BASE_URL` +
-`NAN_API_KEY`).
+Coverage: the NaN adapter is unit-tested with mocked fetch (request shape, 429/5xx mapping, no credential leaks) plus an **opt-in live test** (`npm run test:provider:live` with `RUN_LIVE_PROVIDER=1`, `SPEECH_PROVIDER=nan`, valid `NAN_BASE_URL` + `NAN_API_KEY`).
 
 ### Configuring NaN locally
 

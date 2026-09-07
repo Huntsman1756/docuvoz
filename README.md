@@ -108,7 +108,7 @@ default mock configuration runs without any external credentials.
 
 ## Desktop (Tauri, v0.2 beta)
 
-DocuVoz ships an optional desktop build (Windows beta; macOS arm64 via CI):
+DocuVoz includes a desktop beta build pipeline (Windows beta; macOS arm64 via CI):
 static frontend + a bundled Node sidecar that reuses the same server speech
 runtime. No Node, npm, Git or `.env` file is required on the user machine.
 
@@ -129,8 +129,9 @@ runtime. No Node, npm, Git or `.env` file is required on the user machine.
   per-process bearer token held by Rust, binary audio frame over IPC). Edge
   TTS wording and fallback semantics above apply unchanged.
 
-Build locally: `npx tauri build` (installer under
-`src-tauri/target/release/bundle/nsis/`).
+Build locally: `npx tauri build` (Windows installer under
+`src-tauri/target/release/bundle/nsis/`; a macOS ARM64 build produces the `.app` under
+`bundle/macos/` and the `.dmg` under `bundle/dmg/`).
 
 ## TTS providers
 
@@ -150,7 +151,7 @@ only ever sees an opaque engine id.
 - **NAN** — an optional OpenAI-compatible provider (e.g. Kokoro). Requires
   `NAN_BASE_URL` and `NAN_API_KEY` in the server environment.
 
-Configure providers with environment variables only. Never commit real keys.
+On the web/self-hosted build, providers are configured with environment variables only; on the desktop build they are configured in Settings and secrets live in the OS keychain. Never commit real keys.
 See [docs/providers.md](docs/providers.md).
 
 ## Privacy

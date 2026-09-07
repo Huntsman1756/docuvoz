@@ -25,7 +25,10 @@ The security model is deliberately narrow (see also [docs/privacy.md](docs/priva
 
 - **No secrets in source control.** Credentials live in server-side
   environment variables and are validated at startup. `.env*` is git-ignored;
-  only `.env.example` is committed.
+  only `.env.example` is committed. On the desktop build, the optional provider
+  key lives in the OS credential store (Windows Credential Manager / macOS
+  Keychain) via the `keyring` crate, is held by the Rust shell, and is never
+  exposed to the WebView.
 - **API keys never reach the browser.** Clients call `/api/speech`; the
   server-side adapter is the only code that knows provider credentials.
   Responses contain stable error codes only — no stack traces, provider
@@ -49,14 +52,16 @@ The security model is deliberately narrow (see also [docs/privacy.md](docs/priva
 
 ## Notes and caveats
 
-- DocuVoz runs as a single Next.js process. Rate limiting and dedupe
-  state are **in-memory**; running multiple instances requires shared state.
+- Web/self-hosted deployment: DocuVoz runs as a single Next.js process.
+  Rate limiting and dedupe state are **in-memory**; running multiple instances
+  requires shared state.
 - The filesystem audio cache (`.cache/audio`) stores synthesized speech for
   requests the server has seen. Treat the server host accordingly and do not
   deploy to multi-tenant infrastructure.
-- `SPEECH_PROVIDER=nan` sends the (already normalized, already public-intended)
-  chunk text to a third party. Do not use it with confidential documents
-  without reviewing the provider's terms.
+- `SPEECH_PROVIDER=nan` sends spoken chunk text to a third party. Chunk text
+  is derived from document content and may therefore contain sensitive or
+  confidential material. Do not use it with confidential documents without
+  reviewing the provider's terms.
 
 ## Dependency auditing
 

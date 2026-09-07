@@ -188,7 +188,7 @@ for (const fx of fixtures) {
 const manifest = {
   version: 1,
   notice:
-    "All fixtures are synthetic and legally safe to redistribute. Real Spanish regulatory texts (BOE/CNMV/Banco de España/EUR-Lex) may have redistribution restrictions; corpus/README.md explains how to add local, uncommitted real-world documents and how their hashes are recorded.",
+    "All fixtures are synthetic and legally safe to redistribute. Real Spanish regulatory texts (BOE/CNMV/Banco de España/EUR-Lex) may have redistribution restrictions; evaluation/corpus/README.md explains how to add local, uncommitted real-world documents and how their hashes are recorded.",
   entries: manifestEntries,
 };
 writeFileSync(
